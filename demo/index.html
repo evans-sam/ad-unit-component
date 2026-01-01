@@ -41,14 +41,25 @@
       padding-bottom: 0.5rem;
     }
 
-    .ad-placeholder {
-      background: #e0e0e0;
-      border: 2px dashed #999;
+    .demo-section h3 {
+      font-size: 1rem;
+      color: #555;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    ad-unit {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: 2px solid #5a67d8;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #666;
+      color: white;
       font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    ad-bid {
+      display: none;
     }
 
     /* Common ad sizes */
@@ -90,64 +101,132 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+
+    pre {
+      background: #1a1a2e;
+      color: #a5d6ff;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .code-label {
+      background: #374151;
+      color: #9ca3af;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px 4px 0 0;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      display: inline-block;
+      margin-bottom: -1px;
+    }
+
+    #debug-output {
+      font-family: monospace;
+      font-size: 0.8rem;
+      background: #1a1a2e;
+      color: #a5d6ff;
+      padding: 1rem;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
   <h1>Ad Unit Component Demo</h1>
-  <p class="subtitle">Development test page for ad unit web components</p>
+  <p class="subtitle">Self-registering Prebid ad units with declarative configuration</p>
 
   <div class="demo-section">
-    <h2>Standard IAB Ad Sizes</h2>
+    <h2>Child Bid Elements (Recommended)</h2>
+    <p>Define bidders as child <code>&lt;ad-bid&gt;</code> elements for clean, readable markup:</p>
+
     <div class="ad-grid">
       <div class="ad-item">
         <span class="ad-label">Leaderboard (728x90)</span>
-        <ad-unit class="ad-placeholder leaderboard" data-slot="demo-leaderboard">
-          728 x 90
+        <ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header" class="leaderboard">
+          <ad-bid bidder="appnexus" placement-id="13144370"></ad-bid>
+          <ad-bid bidder="rubicon" account-id="1001" site-id="2002" zone-id="3003"></ad-bid>
+          <ad-bid bidder="ix" site-id="456789"></ad-bid>
+          Header Leaderboard
         </ad-unit>
       </div>
 
       <div class="ad-item">
         <span class="ad-label">Medium Rectangle (300x250)</span>
-        <ad-unit class="ad-placeholder medium-rectangle" data-slot="demo-rectangle">
-          300 x 250
+        <ad-unit code="sidebar-rectangle" sizes="300x250,300x600" gpid="/1234/homepage/sidebar" pos="1" class="medium-rectangle">
+          <ad-bid bidder="appnexus" placement-id="13144371"></ad-bid>
+          <ad-bid bidder="pubmatic" publisher-id="12345" ad-slot="sidebar"></ad-bid>
+          Sidebar Ad
         </ad-unit>
       </div>
+    </div>
 
-      <div class="ad-item">
-        <span class="ad-label">Wide Skyscraper (160x600)</span>
-        <ad-unit class="ad-placeholder wide-skyscraper" data-slot="demo-skyscraper">
-          160 x 600
-        </ad-unit>
-      </div>
+    <span class="code-label">HTML</span>
+    <pre>&lt;ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header"&gt;
+  &lt;ad-bid bidder="appnexus" placement-id="13144370"&gt;&lt;/ad-bid&gt;
+  &lt;ad-bid bidder="rubicon" account-id="1001" site-id="2002" zone-id="3003"&gt;&lt;/ad-bid&gt;
+  &lt;ad-bid bidder="ix" site-id="456789"&gt;&lt;/ad-bid&gt;
+&lt;/ad-unit&gt;</pre>
+  </div>
 
+  <div class="demo-section">
+    <h2>JSON Bids Attribute</h2>
+    <p>For programmatic setup or simpler cases, use the <code>bids</code> JSON attribute:</p>
+
+    <div class="ad-grid">
       <div class="ad-item">
         <span class="ad-label">Mobile Banner (320x50)</span>
-        <ad-unit class="ad-placeholder mobile-banner" data-slot="demo-mobile">
-          320 x 50
+        <ad-unit
+          code="mobile-banner"
+          sizes="320x50"
+          gpid="/1234/mobile/banner"
+          bids='[{"bidder":"appnexus","params":{"placementId":13144372}},{"bidder":"criteo","params":{"zoneId":1234567}}]'
+          class="mobile-banner">
+          Mobile Banner
         </ad-unit>
       </div>
     </div>
+
+    <span class="code-label">HTML</span>
+    <pre>&lt;ad-unit
+  code="mobile-banner"
+  sizes="320x50"
+  bids='[{"bidder":"appnexus","params":{"placementId":789}}]'&gt;
+&lt;/ad-unit&gt;</pre>
   </div>
 
   <div class="demo-section">
-    <h2>In-Content Placement</h2>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+    <h2>Hybrid (Attribute + Children)</h2>
+    <p>Combine both approaches - bids from attribute and child elements are merged:</p>
 
-    <ad-unit class="ad-placeholder medium-rectangle" data-slot="demo-incontent" style="float: right; margin: 0 0 1rem 1rem;">
-      In-Content Ad
-    </ad-unit>
-
-    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-
-    <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
-    <div style="clear: both;"></div>
-  </div>
-
-  <div class="demo-section">
-    <h2>Debug Info</h2>
-    <div id="debug-output" style="font-family: monospace; font-size: 0.875rem; background: #f0f0f0; padding: 1rem; border-radius: 4px;">
-      Loading...
+    <div class="ad-grid">
+      <div class="ad-item">
+        <span class="ad-label">Wide Skyscraper (160x600)</span>
+        <ad-unit
+          code="skyscraper-hybrid"
+          sizes="160x600"
+          bids='[{"bidder":"ix","params":{"siteId":999}}]'
+          class="wide-skyscraper">
+          <ad-bid bidder="appnexus" placement-id="13144373"></ad-bid>
+          Skyscraper
+        </ad-unit>
+      </div>
     </div>
+
+    <span class="code-label">HTML</span>
+    <pre>&lt;ad-unit code="hybrid-ad" sizes="160x600" bids='[{"bidder":"ix","params":{"siteId":999}}]'&gt;
+  &lt;ad-bid bidder="appnexus" placement-id="13144373"&gt;&lt;/ad-bid&gt;
+&lt;/ad-unit&gt;</pre>
+  </div>
+
+  <div class="demo-section">
+    <h2>Generated Prebid Configurations</h2>
+    <p>Each <code>&lt;ad-unit&gt;</code> automatically registers with <code>pbjs.addAdUnits()</code>:</p>
+    <div id="debug-output">Loading...</div>
   </div>
 
   <script type="module" src="./demo.ts"></script>

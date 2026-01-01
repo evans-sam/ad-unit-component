@@ -1,36 +1,46 @@
+// Import components to register them
+import "../src/index";
 import type { AdUnit } from "../src/ad-unit";
 
-// Debug: List all registered ad units on the page
+// Mock pbjs for demo
+window.pbjs = window.pbjs || { que: [] };
+window.pbjs.que = window.pbjs.que || [];
+window.pbjs.addAdUnits = (config) => {
+  console.log("[pbjs.addAdUnits]", config);
+};
+window.pbjs.removeAdUnit = (code) => {
+  console.log("[pbjs.removeAdUnit]", code);
+};
+
+// Process the queue
+function processQueue() {
+  while (window.pbjs?.que.length > 0) {
+    const fn = window.pbjs?.que.shift();
+    fn?.();
+  }
+}
+
+// Display generated configs
 function updateDebugInfo() {
-  const adUnits = document.querySelectorAll("ad-unit");
+  const adUnits = document.querySelectorAll("ad-unit") as NodeListOf<AdUnit>;
   const debugOutput = document.getElementById("debug-output");
 
   if (!debugOutput) return;
 
-  const info = [
-    `Ad Units Found: ${adUnits.length}`,
-    "",
-    ...Array.from(adUnits).map((unit, i) => {
-      const slot = unit.getAttribute("data-slot") || "no-slot";
-      const rect = unit.getBoundingClientRect();
-      const hasShadow = unit.shadowRoot ? "yes" : "no";
-      return `[${i + 1}] slot="${slot}" size=${rect.width}x${rect.height} shadowRoot=${hasShadow}`;
-    }),
-  ];
+  const configs = Array.from(adUnits).map((unit) => {
+    return unit.toAdUnit();
+  });
 
-  debugOutput.textContent = info.join("\n");
+  debugOutput.textContent = JSON.stringify(configs, null, 2);
 }
 
 // Run on load
 document.addEventListener("DOMContentLoaded", () => {
-  updateDebugInfo();
+  // Process any queued Prebid commands
+  processQueue();
 
-  // Trigger render on all ad units
-  const adUnits = document.querySelectorAll("ad-unit") as NodeListOf<AdUnit>;
-
-  // Update debug info after render
+  // Update debug display
   setTimeout(updateDebugInfo, 100);
 });
 
-// Log for HMR confirmation
-console.log("[demo] Ad unit demo loaded");
+console.log("[demo] Ad unit demo loaded with Prebid integration");

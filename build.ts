@@ -4,6 +4,7 @@ const result = await Bun.build({
   target: "browser",
   format: "esm",
   minify: true,
+  sourcemap: "inline",
 });
 
 if (result.success) {

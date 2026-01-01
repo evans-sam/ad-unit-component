@@ -15,7 +15,10 @@
     "build:js": "bun run build.ts",
     "build:types": "tsc --emitDeclarationOnly",
     "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "lint": "biome check",
+    "lint:fix": "biome check --write --unsafe",
+    "format": "biome format --write"
   },
   "exports": {
     ".": {
