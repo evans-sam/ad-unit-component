@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ad Unit Component - Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+
+    .demo-section {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .demo-section h2 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 0.5rem;
+    }
+
+    .ad-placeholder {
+      background: #e0e0e0;
+      border: 2px dashed #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 0.875rem;
+    }
+
+    /* Common ad sizes */
+    .leaderboard {
+      width: 728px;
+      height: 90px;
+    }
+
+    .medium-rectangle {
+      width: 300px;
+      height: 250px;
+    }
+
+    .wide-skyscraper {
+      width: 160px;
+      height: 600px;
+    }
+
+    .mobile-banner {
+      width: 320px;
+      height: 50px;
+    }
+
+    .ad-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .ad-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .ad-label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ad Unit Component Demo</h1>
+  <p class="subtitle">Development test page for ad unit web components</p>
+
+  <div class="demo-section">
+    <h2>Standard IAB Ad Sizes</h2>
+    <div class="ad-grid">
+      <div class="ad-item">
+        <span class="ad-label">Leaderboard (728x90)</span>
+        <div is="ad-unit" class="ad-placeholder leaderboard" data-slot="demo-leaderboard">
+          728 x 90
+        </div>
+      </div>
+
+      <div class="ad-item">
+        <span class="ad-label">Medium Rectangle (300x250)</span>
+        <div is="ad-unit" class="ad-placeholder medium-rectangle" data-slot="demo-rectangle">
+          300 x 250
+        </div>
+      </div>
+
+      <div class="ad-item">
+        <span class="ad-label">Wide Skyscraper (160x600)</span>
+        <div is="ad-unit" class="ad-placeholder wide-skyscraper" data-slot="demo-skyscraper">
+          160 x 600
+        </div>
+      </div>
+
+      <div class="ad-item">
+        <span class="ad-label">Mobile Banner (320x50)</span>
+        <div is="ad-unit" class="ad-placeholder mobile-banner" data-slot="demo-mobile">
+          320 x 50
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h2>In-Content Placement</h2>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+
+    <div is="ad-unit" class="ad-placeholder medium-rectangle" data-slot="demo-incontent" style="float: right; margin: 0 0 1rem 1rem;">
+      In-Content Ad
+    </div>
+
+    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+    <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+    <div style="clear: both;"></div>
+  </div>
+
+  <div class="demo-section">
+    <h2>Debug Info</h2>
+    <div id="debug-output" style="font-family: monospace; font-size: 0.875rem; background: #f0f0f0; padding: 1rem; border-radius: 4px;">
+      Loading...
+    </div>
+  </div>
+
+  <script type="module" src="./demo.ts"></script>
+</body>
+</html>

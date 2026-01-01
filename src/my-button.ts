@@ -16,8 +16,9 @@ export class MyButton extends HTMLElement {
   }
 
   render() {
-    // biome-ignore lint/style/noNonNullAssertion: shadowRoot is always defined after attachShadow
-    this.shadowRoot!.innerHTML = `
+    if (!this.shadowRoot) return;
+
+    this.shadowRoot.innerHTML = `
       <style>
         button { padding: 8px 16px; }
       </style>
