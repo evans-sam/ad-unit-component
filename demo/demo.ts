@@ -2,7 +2,7 @@ import type { AdUnit } from "../src/ad-unit";
 
 // Debug: List all registered ad units on the page
 function updateDebugInfo() {
-  const adUnits = document.querySelectorAll('[is="ad-unit"]');
+  const adUnits = document.querySelectorAll("ad-unit");
   const debugOutput = document.getElementById("debug-output");
 
   if (!debugOutput) return;
@@ -26,12 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateDebugInfo();
 
   // Trigger render on all ad units
-  const adUnits = document.querySelectorAll(
-    '[is="ad-unit"]',
-  ) as NodeListOf<AdUnit>;
-  adUnits.forEach((unit) => {
-    unit.render();
-  });
+  const adUnits = document.querySelectorAll("ad-unit") as NodeListOf<AdUnit>;
 
   // Update debug info after render
   setTimeout(updateDebugInfo, 100);
