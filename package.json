@@ -9,6 +9,7 @@
     "dist"
   ],
   "scripts": {
+    "prepare": "lefthook install",
     "build": "bun run build:js && bun run build:types",
     "build:js": "bun run build.ts",
     "build:types": "tsc --emitDeclarationOnly"
