@@ -1,0 +1,30 @@
+{
+  "name": "ad-unit-component",
+  "version": "0.1.0",
+  "module": "index.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun run build:js && bun run build:types",
+    "build:js": "bun run build.ts",
+    "build:types": "tsc --emitDeclarationOnly"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.10",
+    "@types/bun": "latest",
+    "lefthook": "^2.0.13"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
