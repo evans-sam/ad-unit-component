@@ -45,62 +45,123 @@ describe("AdBid", () => {
     });
   });
 
+  describe("params property", () => {
+    test("parses params JSON attribute", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", '{"placementId": 123456}');
+      expect(element.params).toEqual({ placementId: 123456 });
+    });
+
+    test("returns empty object when not set", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      expect(element.params).toEqual({});
+    });
+
+    test("returns empty object for invalid JSON", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", "invalid-json");
+      expect(element.params).toEqual({});
+    });
+
+    test("sets params from object", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.params = { siteId: 999 };
+      expect(element.getAttribute("params")).toBe('{"siteId":999}');
+    });
+
+    test("sets params from string", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.params = '{"zoneId": 555}';
+      expect(element.params).toEqual({ zoneId: 555 });
+    });
+
+    test("preserves string types in params", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", '{"publisherId": "156276"}');
+      expect(element.params.publisherId).toBe("156276");
+      expect(typeof element.params.publisherId).toBe("string");
+    });
+
+    test("preserves number types in params", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", '{"placementId": 13144370}');
+      expect(element.params.placementId).toBe(13144370);
+      expect(typeof element.params.placementId).toBe("number");
+    });
+
+    test("handles nested objects", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute(
+        "params",
+        '{"video": {"mimes": ["video/mp4"], "maxduration": 30}}',
+      );
+      expect(element.params).toEqual({
+        video: { mimes: ["video/mp4"], maxduration: 30 },
+      });
+    });
+
+    test("handles arrays", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", '{"keywords": ["sports", "news"]}');
+      expect(element.params.keywords).toEqual(["sports", "news"]);
+    });
+
+    test("handles boolean values", () => {
+      const element = document.createElement("ad-bid") as AdBid;
+      element.setAttribute("params", '{"coppa": true, "gdpr": false}');
+      expect(element.params.coppa).toBe(true);
+      expect(element.params.gdpr).toBe(false);
+    });
+  });
+
   describe("toBid()", () => {
-    test("returns bid object with bidder", () => {
+    test("returns bid object with bidder and params", () => {
       const element = document.createElement("ad-bid") as AdBid;
       element.setAttribute("bidder", "appnexus");
+      element.setAttribute("params", '{"placementId": 13144370}');
       const bid = element.toBid();
-      expect(bid.bidder).toBe("appnexus");
+      expect(bid).toEqual({
+        bidder: "appnexus",
+        params: { placementId: 13144370 },
+      });
     });
 
-    test("converts kebab-case attributes to camelCase params", () => {
-      const element = document.createElement("ad-bid") as AdBid;
-      element.setAttribute("bidder", "appnexus");
-      element.setAttribute("placement-id", "123456");
-      element.setAttribute("site-id", "789");
-      const bid = element.toBid();
-      expect(bid.params.placementId).toBe(123456);
-      expect(bid.params.siteId).toBe(789);
-    });
-
-    test("parses numeric values", () => {
+    test("returns empty params when not set", () => {
       const element = document.createElement("ad-bid") as AdBid;
       element.setAttribute("bidder", "test");
-      element.setAttribute("count", "42");
       const bid = element.toBid();
-      expect(bid.params.count).toBe(42);
+      expect(bid.params).toEqual({});
     });
 
-    test("parses JSON values", () => {
+    test("handles PubMatic with string publisherId", () => {
       const element = document.createElement("ad-bid") as AdBid;
-      element.setAttribute("bidder", "test");
-      element.setAttribute("options", '{"key":"value"}');
+      element.setAttribute("bidder", "pubmatic");
+      element.setAttribute(
+        "params",
+        '{"publisherId": "156276", "adSlot": "div-gpt-ad-1"}',
+      );
       const bid = element.toBid();
-      expect(bid.params.options).toEqual({ key: "value" });
+      expect(bid.params.publisherId).toBe("156276");
+      expect(typeof bid.params.publisherId).toBe("string");
     });
 
-    test("keeps string values as strings", () => {
+    test("handles complex bidder config", () => {
       const element = document.createElement("ad-bid") as AdBid;
-      element.setAttribute("bidder", "test");
-      element.setAttribute("name", "my-placement");
+      element.setAttribute("bidder", "rubicon");
+      element.setAttribute(
+        "params",
+        '{"accountId": 14062, "siteId": 70608, "zoneId": 498816, "inventory": {"rating": "5"}}',
+      );
       const bid = element.toBid();
-      expect(bid.params.name).toBe("my-placement");
-    });
-
-    test("excludes bidder from params", () => {
-      const element = document.createElement("ad-bid") as AdBid;
-      element.setAttribute("bidder", "appnexus");
-      element.setAttribute("placement-id", "123");
-      const bid = element.toBid();
-      expect(bid.params.bidder).toBeUndefined();
-    });
-
-    test("handles boolean JSON values", () => {
-      const element = document.createElement("ad-bid") as AdBid;
-      element.setAttribute("bidder", "test");
-      element.setAttribute("enabled", "true");
-      const bid = element.toBid();
-      expect(bid.params.enabled).toBe(true);
+      expect(bid).toEqual({
+        bidder: "rubicon",
+        params: {
+          accountId: 14062,
+          siteId: 70608,
+          zoneId: 498816,
+          inventory: { rating: "5" },
+        },
+      });
     });
   });
 });

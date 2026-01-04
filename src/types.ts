@@ -1,5 +1,7 @@
 /**
- * Prebid.js type definitions for ad unit configuration
+ * Prebid.js type definitions for banner ad unit configuration
+ *
+ * @see https://docs.prebid.org/dev-docs/adunit-reference.html#adunitmediatypesbanner
  */
 
 export interface BidParams {
@@ -13,37 +15,50 @@ export interface Bid {
   labelAll?: string[];
 }
 
+/**
+ * OpenRTB page position values
+ * @see https://docs.prebid.org/dev-docs/adunit-reference.html
+ */
+export enum BannerPosition {
+  Unknown = 0,
+  AboveTheFold = 1,
+  BelowTheFold = 3,
+  Header = 4,
+  Footer = 5,
+  Sidebar = 6,
+  Fullscreen = 7,
+}
+
+/**
+ * ORTB format object for flexible banner sizing
+ * Used as alternative to sizes array
+ */
+export interface BannerFormat {
+  w: number;
+  h: number;
+}
+
+/**
+ * Banner media type configuration
+ * Either sizes or format must be provided
+ */
 export interface BannerMediaType {
-  sizes: number[][];
-  pos?: number;
+  /** Banner sizes as array of [width, height] tuples */
+  sizes?: number[][];
+  /** Alternative to sizes - array of {w, h} format objects */
+  format?: BannerFormat[];
+  /** OpenRTB page position value */
+  pos?: BannerPosition | number;
+  /** Name for debugging/testing */
   name?: string;
 }
 
-export interface VideoMediaType {
-  context: "instream" | "outstream" | "adpod";
-  playerSize?: number[];
-  mimes?: string[];
-  protocols?: number[];
-  playbackmethod?: number[];
-  minduration?: number;
-  maxduration?: number;
-  w?: number;
-  h?: number;
-  startdelay?: number;
-  skip?: number;
-  pos?: number;
-}
-
-export interface NativeMediaType {
-  ortb?: {
-    assets: unknown[];
-  };
-}
-
+/**
+ * Media types object for ad unit
+ * This base component only supports banner; extend for video/native
+ */
 export interface MediaTypes {
   banner?: BannerMediaType;
-  video?: VideoMediaType;
-  native?: NativeMediaType;
 }
 
 export interface Ortb2Imp {
@@ -71,8 +86,9 @@ declare global {
   interface Window {
     pbjs?: {
       que: Array<() => void>;
-      addAdUnits: (adUnits: PrebidAdUnit | PrebidAdUnit[]) => void;
-      removeAdUnit: (code: string) => void;
-    };
+      addAdUnits?: (adUnits: PrebidAdUnit | PrebidAdUnit[]) => void;
+      removeAdUnit?: (code: string) => void;
+      // biome-ignore lint/suspicious/noExplicitAny: TODO add the rest of necessary prebid type
+    } & any;
   }
 }

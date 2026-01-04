@@ -1,24 +1,13 @@
 // Import components to register them
 import "../src/index";
-import type { AdUnit } from "../src/ad-unit";
+import type { AdUnit } from "../src";
 
 // Mock pbjs for demo
-window.pbjs = window.pbjs || { que: [] };
+window.pbjs = window.pbjs ?? { que: [] };
 window.pbjs.que = window.pbjs.que || [];
-window.pbjs.addAdUnits = (config) => {
-  console.log("[pbjs.addAdUnits]", config);
-};
-window.pbjs.removeAdUnit = (code) => {
-  console.log("[pbjs.removeAdUnit]", code);
-};
-
-// Process the queue
-function processQueue() {
-  while (window.pbjs?.que.length > 0) {
-    const fn = window.pbjs?.que.shift();
-    fn?.();
-  }
-}
+window.pbjs.que.push(() => {
+  window.pbjs?.setConfig({ debug: true });
+});
 
 // Display generated configs
 function updateDebugInfo() {
@@ -36,9 +25,6 @@ function updateDebugInfo() {
 
 // Run on load
 document.addEventListener("DOMContentLoaded", () => {
-  // Process any queued Prebid commands
-  processQueue();
-
   // Update debug display
   setTimeout(updateDebugInfo, 100);
 });

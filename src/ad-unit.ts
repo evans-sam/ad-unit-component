@@ -1,28 +1,54 @@
 import { AdBid } from "./ad-bid";
-import type { Bid, MediaTypes, PrebidAdUnit } from "./types";
+import type { BannerFormat, Bid, MediaTypes, PrebidAdUnit } from "./types";
 import { parseSizes, serializeSizes } from "./utils/parse-sizes";
 
 /**
- * AdUnit web component - self-registering Prebid ad unit
+ * AdUnit web component - self-registering Prebid banner ad unit
+ *
+ * This component handles ONLY banner ads. For video/native ads,
+ * use extending implementations.
  *
  * @example
  * ```html
- * <!-- With child bid elements -->
- * <ad-unit code="header-ad" sizes="728x90,970x250">
- *   <ad-bid bidder="appnexus" placement-id="123456"></ad-bid>
- *   <ad-bid bidder="rubicon" account-id="1001" site-id="2002"></ad-bid>
+ * <!-- Basic banner with sizes -->
+ * <ad-unit code="header-ad" sizes="728x90,970x250" pos="1" gpid="/1234/homepage/header">
+ *   <ad-bid bidder="appnexus" params='{"placementId": 13144370}'></ad-bid>
+ *   <ad-bid bidder="pubmatic" params='{"publisherId": "156276", "adSlot": "div-1"}'></ad-bid>
  * </ad-unit>
  *
- * <!-- With bids attribute -->
+ * <!-- Using ORTB format instead of sizes -->
+ * <ad-unit code="flex-ad" format='[{"w":300,"h":250},{"w":320,"h":50}]' pos="3">
+ *   <ad-bid bidder="appnexus" params='{"placementId": 789}'></ad-bid>
+ * </ad-unit>
+ *
+ * <!-- With bids attribute (inline JSON) -->
  * <ad-unit
  *   code="sidebar-ad"
  *   sizes="300x250"
+ *   pos="6"
+ *   name="sidebar-debug"
  *   bids='[{"bidder":"appnexus","params":{"placementId":789}}]'>
  * </ad-unit>
  * ```
+ *
+ * @attr code - Unique identifier for this ad unit
+ * @attr sizes - Banner sizes as "WxH,WxH" or JSON array format
+ * @attr format - ORTB format objects as alternative to sizes (takes precedence)
+ * @attr pos - OpenRTB position (0=unknown, 1=ATF, 3=BTF, 4=header, 5=footer, 6=sidebar, 7=fullscreen)
+ * @attr name - Banner name for debugging
+ * @attr gpid - Global Placement ID for first-party data
+ * @attr bids - JSON array of bid configurations
  */
 export class AdUnit extends HTMLElement {
-  static observedAttributes = ["code", "sizes", "gpid", "pos", "bids"];
+  static observedAttributes = [
+    "code",
+    "sizes",
+    "format",
+    "gpid",
+    "pos",
+    "name",
+    "bids",
+  ];
 
   #registered = false;
 
@@ -76,11 +102,14 @@ export class AdUnit extends HTMLElement {
   }
 
   /**
-   * Ad position on page (0-7 per IAB spec)
+   * OpenRTB page position value
+   * 0=unknown, 1=above-the-fold, 3=below-the-fold, 4=header, 5=footer, 6=sidebar, 7=fullscreen
    */
   get pos(): number | null {
-    const attr = this.getAttribute("pos");
-    return attr ? Number(attr) : null;
+    const value = this.getAttribute("pos");
+    if (value === null) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   set pos(value: number | null) {
@@ -88,6 +117,55 @@ export class AdUnit extends HTMLElement {
       this.setAttribute("pos", String(value));
     } else {
       this.removeAttribute("pos");
+    }
+  }
+
+  /**
+   * Banner name for debugging/testing
+   */
+  get name(): string | null {
+    return this.getAttribute("name");
+  }
+
+  set name(value: string | null) {
+    if (value) {
+      this.setAttribute("name", value);
+    } else {
+      this.removeAttribute("name");
+    }
+  }
+
+  /**
+   * ORTB format objects as alternative to sizes
+   * Format: '[{"w":300,"h":250},{"w":728,"h":90}]'
+   */
+  get format(): BannerFormat[] | null {
+    const value = this.getAttribute("format");
+    if (!value) return null;
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (f): f is BannerFormat =>
+            typeof f === "object" &&
+            f !== null &&
+            typeof f.w === "number" &&
+            typeof f.h === "number",
+        );
+      }
+    } catch {
+      console.warn(`[ad-unit] Invalid format JSON for "${this.code}"`);
+    }
+    return null;
+  }
+
+  set format(value: BannerFormat[] | string | null) {
+    if (value === null) {
+      this.removeAttribute("format");
+    } else if (typeof value === "string") {
+      this.setAttribute("format", value);
+    } else {
+      this.setAttribute("format", JSON.stringify(value));
     }
   }
 
@@ -133,6 +211,35 @@ export class AdUnit extends HTMLElement {
   // --- Bid collection ---
 
   /**
+   * Build the Prebid adUnit configuration object
+   */
+  toAdUnit(): PrebidAdUnit {
+    const config: PrebidAdUnit = {
+      code: this.code,
+      mediaTypes: this.#buildMediaTypes(),
+    };
+
+    // Add bids if any
+    const bids = this.#collectBids();
+    if (bids.length > 0) {
+      config.bids = bids;
+    }
+
+    // Add first-party data if gpid is set
+    if (this.gpid) {
+      config.ortb2Imp = {
+        ext: {
+          gpid: this.gpid,
+        },
+      };
+    }
+
+    return config;
+  }
+
+  // --- Prebid Integration ---
+
+  /**
    * Collect bids from both attribute and child elements
    */
   #collectBids(): Bid[] {
@@ -162,47 +269,36 @@ export class AdUnit extends HTMLElement {
     return bids;
   }
 
-  // --- Prebid Integration ---
-
-  /**
-   * Build the Prebid adUnit configuration object
-   */
-  toAdUnit(): PrebidAdUnit {
-    const config: PrebidAdUnit = {
-      code: this.code,
-      mediaTypes: this.#buildMediaTypes(),
-    };
-
-    // Add bids if any
-    const bids = this.#collectBids();
-    if (bids.length > 0) {
-      config.bids = bids;
-    }
-
-    // Add first-party data if gpid is set
-    if (this.gpid) {
-      config.ortb2Imp = {
-        ext: {
-          gpid: this.gpid,
-        },
-      };
-    }
-
-    return config;
-  }
-
   /**
    * Build mediaTypes object from attributes
+   * Per Prebid spec: either sizes or format must be provided for banner
    */
   #buildMediaTypes(): MediaTypes {
     const mediaTypes: MediaTypes = {};
 
     const sizes = this.sizes;
-    if (sizes.length > 0) {
-      mediaTypes.banner = { sizes };
+    const format = this.format;
 
-      if (this.pos !== null) {
-        mediaTypes.banner.pos = this.pos;
+    // Banner requires either sizes or format
+    if (sizes.length > 0 || format) {
+      mediaTypes.banner = {};
+
+      // format takes precedence over sizes per Prebid docs
+      if (format && format.length > 0) {
+        mediaTypes.banner.format = format;
+      } else if (sizes.length > 0) {
+        mediaTypes.banner.sizes = sizes;
+      }
+
+      // Add optional banner properties
+      const pos = this.pos;
+      if (pos !== null) {
+        mediaTypes.banner.pos = pos;
+      }
+
+      const name = this.name;
+      if (name) {
+        mediaTypes.banner.name = name;
       }
     }
 
@@ -231,7 +327,7 @@ export class AdUnit extends HTMLElement {
     }
     window.pbjs.que = window.pbjs.que || [];
     window.pbjs.que.push(() => {
-      window.pbjs?.addAdUnits(config);
+      window.pbjs?.addAdUnits?.(config);
       console.debug(`[ad-unit] Registered "${this.code}" with Prebid`);
     });
 
@@ -245,7 +341,7 @@ export class AdUnit extends HTMLElement {
     if (!this.#registered || !this.code) return;
 
     window.pbjs?.que.push(() => {
-      window.pbjs?.removeAdUnit(this.code);
+      window.pbjs?.removeAdUnit?.(this.code);
       console.debug(`[ad-unit] Unregistered "${this.code}" from Prebid`);
     });
 

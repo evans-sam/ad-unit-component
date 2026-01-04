@@ -3,14 +3,18 @@ import type { Bid, BidParams } from "./types";
 /**
  * AdBid component - declarative bid configuration for ad units
  *
+ * Uses JSON for params to preserve exact types (strings vs numbers)
+ * and support any param key names without HTML attribute restrictions.
+ *
  * @example
  * ```html
- * <ad-bid bidder="appnexus" placement-id="123456"></ad-bid>
- * <ad-bid bidder="rubicon" account-id="1001" site-id="2002" zone-id="3003"></ad-bid>
+ * <ad-bid bidder="appnexus" params='{"placementId": 13144370}'></ad-bid>
+ * <ad-bid bidder="pubmatic" params='{"publisherId": "156276", "adSlot": "div-1"}'></ad-bid>
+ * <ad-bid bidder="rubicon" params='{"accountId": 1001, "siteId": 2002, "zoneId": 3003}'></ad-bid>
  * ```
  */
 export class AdBid extends HTMLElement {
-  static observedAttributes = ["bidder"];
+  static observedAttributes = ["bidder", "params"];
 
   /**
    * Get the bidder name
@@ -24,37 +28,28 @@ export class AdBid extends HTMLElement {
   }
 
   /**
-   * Convert all non-bidder attributes to a params object
-   * Converts kebab-case attributes to camelCase params
+   * Get params as object
    */
-  #collectParams(): BidParams {
-    const params: BidParams = {};
-
-    for (const attr of Array.from(this.attributes)) {
-      if (attr.name === "bidder") continue;
-
-      // Convert kebab-case to camelCase
-      const camelKey = attr.name.replace(
-        /-([a-z])/g,
-        (_: string, letter: string) => letter.toUpperCase(),
-      );
-
-      // Try to parse as JSON/number, otherwise keep as string
-      let value: unknown = attr.value;
-      try {
-        value = JSON.parse(attr.value);
-      } catch {
-        // Check if it's a number
-        const num = Number(attr.value);
-        if (!Number.isNaN(num) && attr.value.trim() !== "") {
-          value = num;
-        }
+  get params(): BidParams {
+    const value = this.getAttribute("params");
+    if (!value) return {};
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === "object" && parsed !== null) {
+        return parsed as BidParams;
       }
-
-      params[camelKey] = value;
+    } catch {
+      console.warn(`[ad-bid] Invalid params JSON for bidder "${this.bidder}"`);
     }
+    return {};
+  }
 
-    return params;
+  set params(value: BidParams | string) {
+    if (typeof value === "string") {
+      this.setAttribute("params", value);
+    } else {
+      this.setAttribute("params", JSON.stringify(value));
+    }
   }
 
   /**
@@ -63,7 +58,7 @@ export class AdBid extends HTMLElement {
   toBid(): Bid {
     return {
       bidder: this.bidder,
-      params: this.#collectParams(),
+      params: this.params,
     };
   }
 }
