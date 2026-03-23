@@ -41,12 +41,6 @@
       padding-bottom: 0.5rem;
     }
 
-    .demo-section h3 {
-      font-size: 1rem;
-      color: #555;
-      margin: 1.5rem 0 0.75rem;
-    }
-
     ad-unit {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border: 2px solid #5a67d8;
@@ -56,10 +50,6 @@
       color: white;
       font-size: 0.875rem;
       font-weight: 500;
-    }
-
-    ad-bid {
-      display: none;
     }
 
     /* Common ad sizes */
@@ -135,24 +125,19 @@
       overflow-y: auto;
     }
   </style>
-  <!-- required scripts -->
-  <script async src="https://cdn.jsdelivr.net/npm/prebid.js@latest/dist/not-for-prod/prebid.js"></script>
 </head>
 <body>
-  <h1>Banner Ad Unit Component Demo</h1>
-  <p class="subtitle">Self-registering Prebid banner ad units with declarative configuration</p>
+  <h1>Ad Unit Component Demo</h1>
+  <p class="subtitle">Declarative ad unit lifecycle management with web components</p>
 
   <div class="demo-section">
-    <h2>Child Bid Elements</h2>
-    <p>Define bidders as child <code>&lt;ad-bid&gt;</code> elements with JSON <code>params</code>:</p>
+    <h2>Standard Sizes</h2>
+    <p>Declare ad units with <code>code</code>, <code>sizes</code>, and optional <code>gpid</code>/<code>pos</code> attributes:</p>
 
     <div class="ad-grid">
       <div class="ad-item">
         <span class="ad-label">Leaderboard (728x90) - Above the fold</span>
         <ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header" pos="1" name="header-leaderboard-atf" class="leaderboard">
-          <ad-bid bidder="appnexus" params='{"placementId": 13144370}'></ad-bid>
-          <ad-bid bidder="rubicon" params='{"accountId": 14062, "siteId": 70608, "zoneId": 498816}'></ad-bid>
-          <ad-bid bidder="openx" params='{"unit": "539439964", "delDomain": "se-demo-d.openx.net"}'></ad-bid>
           Header Leaderboard
         </ad-unit>
       </div>
@@ -160,9 +145,6 @@
       <div class="ad-item">
         <span class="ad-label">Medium Rectangle (300x250) - Sidebar</span>
         <ad-unit code="sidebar-rectangle" sizes="300x250,300x600" gpid="/1234/homepage/sidebar" pos="6" name="sidebar-mrec" class="medium-rectangle">
-          <ad-bid bidder="pubmatic" params='{"publisherId": "156276", "adSlot": "pubmatic_test"}'></ad-bid>
-          <ad-bid bidder="ix" params='{"siteId": "9999990"}'></ad-bid>
-          <ad-bid bidder="criteo" params='{"zoneId": 497747}'></ad-bid>
           Sidebar Ad
         </ad-unit>
       </div>
@@ -170,9 +152,6 @@
 
     <span class="code-label">HTML</span>
     <pre>&lt;ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header" pos="1"&gt;
-  &lt;ad-bid bidder="appnexus" params='{"placementId": 13144370}'&gt;&lt;/ad-bid&gt;
-  &lt;ad-bid bidder="pubmatic" params='{"publisherId": "156276", "adSlot": "div-1"}'&gt;&lt;/ad-bid&gt;
-  &lt;ad-bid bidder="rubicon" params='{"accountId": 14062, "siteId": 70608, "zoneId": 498816}'&gt;&lt;/ad-bid&gt;
 &lt;/ad-unit&gt;
 
 &lt;!-- pos values: 0=unknown, 1=ATF, 3=BTF, 4=header, 5=footer, 6=sidebar, 7=fullscreen --&gt;</pre>
@@ -192,7 +171,6 @@
           pos="3"
           name="flex-banner-btf"
           class="medium-rectangle">
-          <ad-bid bidder="appnexus" params='{"placementId": 13144370}'></ad-bid>
           Flex Banner
         </ad-unit>
       </div>
@@ -200,67 +178,13 @@
 
     <span class="code-label">HTML</span>
     <pre>&lt;ad-unit code="flex-banner" format='[{"w":300,"h":250},{"w":320,"h":50}]' pos="3"&gt;
-  &lt;ad-bid bidder="appnexus" params='{"placementId": 13144370}'&gt;&lt;/ad-bid&gt;
 &lt;/ad-unit&gt;
 
 &lt;!-- format takes precedence over sizes if both are provided --&gt;</pre>
   </div>
 
   <div class="demo-section">
-    <h2>JSON Bids Attribute</h2>
-    <p>For programmatic setup or simpler cases, use the <code>bids</code> JSON attribute:</p>
-
-    <div class="ad-grid">
-      <div class="ad-item">
-        <span class="ad-label">Mobile Banner (320x50) - Below the fold</span>
-        <ad-unit
-          code="mobile-banner"
-          sizes="320x50"
-          gpid="/1234/mobile/banner"
-          pos="3"
-          bids='[{"bidder":"mediafuse","params":{"placementId":13144370}},{"bidder":"33across","params":{"siteId":"examplePub123","productId":"siab","test":1}}]'
-          class="mobile-banner">
-          Mobile Banner
-        </ad-unit>
-      </div>
-    </div>
-
-    <span class="code-label">HTML</span>
-    <pre>&lt;ad-unit
-  code="mobile-banner"
-  sizes="320x50"
-  pos="3"
-  bids='[{"bidder":"mediafuse","params":{"placementId":13144370}},{"bidder":"33across","params":{"siteId":"examplePub123","productId":"siab","test":1}}]'&gt;
-&lt;/ad-unit&gt;</pre>
-  </div>
-
-  <div class="demo-section">
-    <h2>Hybrid (Attribute + Children)</h2>
-    <p>Combine both approaches - bids from attribute and child elements are merged:</p>
-
-    <div class="ad-grid">
-      <div class="ad-item">
-        <span class="ad-label">Wide Skyscraper (160x600)</span>
-        <ad-unit
-          code="skyscraper-hybrid"
-          sizes="160x600"
-          bids='[{"bidder":"ix","params":{"siteId":"9999990"}}]'
-          class="wide-skyscraper">
-          <ad-bid bidder="appnexus" params='{"placementId": 13144370}'></ad-bid>
-          Skyscraper
-        </ad-unit>
-      </div>
-    </div>
-
-    <span class="code-label">HTML</span>
-    <pre>&lt;ad-unit code="hybrid-ad" sizes="160x600" bids='[{"bidder":"ix","params":{"siteId":"9999990"}}]'&gt;
-  &lt;ad-bid bidder="appnexus" params='{"placementId": 13144370}'&gt;&lt;/ad-bid&gt;
-&lt;/ad-unit&gt;</pre>
-  </div>
-
-  <div class="demo-section">
-    <h2>Generated Prebid Configurations</h2>
-    <p>Each <code>&lt;ad-unit&gt;</code> automatically registers with <code>pbjs.addAdUnits()</code>:</p>
+    <h2>Ad Unit Attributes</h2>
     <div id="debug-output">Loading...</div>
   </div>
 

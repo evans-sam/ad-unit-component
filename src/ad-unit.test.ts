@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { AdUnit } from "./ad-unit";
-import "./ad-bid"; // Ensure AdBid is registered
 
 describe("AdUnit", () => {
   let container: HTMLDivElement;
@@ -8,18 +7,10 @@ describe("AdUnit", () => {
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
-
-    // Mock pbjs
-    window.pbjs = {
-      que: [],
-      addAdUnits: () => {},
-      removeAdUnit: () => {},
-    };
   });
 
   afterEach(() => {
     container.remove();
-    window.pbjs = undefined;
   });
 
   describe("registration", () => {
@@ -221,200 +212,58 @@ describe("AdUnit", () => {
     });
   });
 
-  describe("toAdUnit()", () => {
-    test("returns basic config with code and sizes", () => {
+  describe("vendor decoupling", () => {
+    test("does not have a toAdUnit method", () => {
       const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      const config = element.toAdUnit();
-      expect(config.code).toBe("test-ad");
-      expect(config.mediaTypes.banner?.sizes).toEqual([[300, 250]]);
+      expect("toAdUnit" in element).toBe(false);
     });
 
-    test("includes gpid in ortb2Imp", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute("gpid", "/1234/test");
-      const config = element.toAdUnit();
-      expect(config.ortb2Imp?.ext?.gpid).toBe("/1234/test");
+    test("does not observe a bids attribute", () => {
+      expect(AdUnit.observedAttributes).not.toContain("bids");
     });
 
-    test("includes pos in banner mediaType", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute("pos", "1");
-      const config = element.toAdUnit();
-      expect(config.mediaTypes.banner?.pos).toBe(1);
-    });
-
-    test("includes name in banner mediaType", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute("name", "debug-banner");
-      const config = element.toAdUnit();
-      expect(config.mediaTypes.banner?.name).toBe("debug-banner");
-    });
-
-    test("uses format instead of sizes when both provided", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute("format", '[{"w":320,"h":50}]');
-      const config = element.toAdUnit();
-      expect(config.mediaTypes.banner?.format).toEqual([{ w: 320, h: 50 }]);
-      expect(config.mediaTypes.banner?.sizes).toBeUndefined();
-    });
-
-    test("uses format alone without sizes", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("format", '[{"w":728,"h":90}]');
-      const config = element.toAdUnit();
-      expect(config.mediaTypes.banner?.format).toEqual([{ w: 728, h: 90 }]);
-      expect(config.mediaTypes.banner?.sizes).toBeUndefined();
-    });
-
-    test("includes all banner properties together", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250,728x90");
-      element.setAttribute("pos", "1");
-      element.setAttribute("name", "atf-banner");
-      element.setAttribute("gpid", "/1234/homepage/header");
-      const config = element.toAdUnit();
-      expect(config.mediaTypes.banner).toEqual({
-        sizes: [
-          [300, 250],
-          [728, 90],
-        ],
-        pos: 1,
-        name: "atf-banner",
-      });
-      expect(config.ortb2Imp?.ext?.gpid).toBe("/1234/homepage/header");
-    });
-
-    test("collects bids from attribute", () => {
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute(
-        "bids",
-        '[{"bidder":"appnexus","params":{"placementId":123}}]',
-      );
-      const config = element.toAdUnit();
-      expect(config.bids).toHaveLength(1);
-      expect(config.bids?.[0]?.bidder).toBe("appnexus");
-      expect(config.bids?.[0]?.params.placementId).toBe(123);
-    });
-
-    test("collects bids from child elements", () => {
+    test("does not reference window.pbjs on connect", () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("code", "test-ad");
       element.setAttribute("sizes", "300x250");
 
-      const bid = document.createElement("ad-bid");
-      bid.setAttribute("bidder", "rubicon");
-      bid.setAttribute("params", '{"accountId": 1001}');
-      element.appendChild(bid);
+      // Ensure no pbjs interaction
+      // biome-ignore lint/suspicious/noExplicitAny: verifying vendor decoupling
+      (window as any).pbjs = undefined;
+      container.appendChild(element);
 
-      const config = element.toAdUnit();
-      expect(config.bids).toHaveLength(1);
-      expect(config.bids?.[0]?.bidder).toBe("rubicon");
-      expect(config.bids?.[0]?.params.accountId).toBe(1001);
+      // Should not throw or create window.pbjs
+      // biome-ignore lint/suspicious/noExplicitAny: verifying vendor decoupling
+      expect((window as any).pbjs).toBeUndefined();
     });
 
-    test("combines bids from attribute and children", () => {
+    test("does not reference window.pbjs on disconnect", () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
-      element.setAttribute(
-        "bids",
-        '[{"bidder":"appnexus","params":{"placementId":123}}]',
-      );
+      container.appendChild(element);
 
-      const bid = document.createElement("ad-bid");
-      bid.setAttribute("bidder", "rubicon");
-      bid.setAttribute("params", '{"accountId": 1001}');
-      element.appendChild(bid);
+      // biome-ignore lint/suspicious/noExplicitAny: verifying vendor decoupling
+      (window as any).pbjs = undefined;
+      container.removeChild(element);
 
-      const config = element.toAdUnit();
-      expect(config.bids).toHaveLength(2);
-      expect(config.bids?.[0]?.bidder).toBe("appnexus");
-      expect(config.bids?.[1]?.bidder).toBe("rubicon");
+      // biome-ignore lint/suspicious/noExplicitAny: verifying vendor decoupling
+      expect((window as any).pbjs).toBeUndefined();
     });
   });
 
-  describe("Prebid integration", () => {
-    test("registers with Prebid on connect", () => {
-      let registered = false;
-      window.pbjs = {
-        que: [],
-        addAdUnits: () => {
-          registered = true;
-        },
-        removeAdUnit: () => {},
-      };
-
+  describe("lifecycle", () => {
+    test("renders shadow DOM on connect", () => {
       const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
       container.appendChild(element);
-
-      // Execute queued commands
-      window.pbjs?.que.forEach((fn: () => void) => {
-        fn();
-      });
-
-      expect(registered).toBe(true);
+      expect(element.shadowRoot?.innerHTML).toContain("<slot>");
+      expect(element.shadowRoot?.innerHTML).toContain(":host");
     });
 
-    test("unregisters from Prebid on disconnect", () => {
-      let unregisteredCode = "";
-      window.pbjs = {
-        que: [],
-        addAdUnits: () => {},
-        removeAdUnit: (code: string) => {
-          unregisteredCode = code;
-        },
-      };
-
+    test("re-renders on attribute change while connected", () => {
       const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("sizes", "300x250");
       container.appendChild(element);
-      container.removeChild(element);
-
-      // Execute queued commands
-      window.pbjs?.que.forEach((fn: () => void) => {
-        fn();
-      });
-
-      expect(unregisteredCode).toBe("test-ad");
-    });
-
-    test("does not register without code", () => {
-      let registerCalled = false;
-      window.pbjs = {
-        que: [],
-        addAdUnits: () => {
-          registerCalled = true;
-        },
-        removeAdUnit: () => {},
-      };
-
-      const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("sizes", "300x250");
-      container.appendChild(element);
-
-      // Execute queued commands
-      window.pbjs?.que.forEach((fn: () => void) => {
-        fn();
-      });
-
-      expect(registerCalled).toBe(false);
+      element.setAttribute("code", "new-code");
+      expect(element.shadowRoot?.innerHTML).toContain("<slot>");
     });
   });
 });
