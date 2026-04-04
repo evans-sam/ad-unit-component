@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { AdUnit } from "./ad-unit";
 
 describe("AdUnit", () => {
@@ -160,6 +160,14 @@ describe("AdUnit", () => {
       element.name = null;
       expect(element.hasAttribute("name")).toBe(false);
     });
+
+    test("sets empty string attribute instead of removing it", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("name", "test");
+      element.name = "";
+      expect(element.hasAttribute("name")).toBe(true);
+      expect(element.getAttribute("name")).toBe("");
+    });
   });
 
   describe("format property", () => {
@@ -209,6 +217,12 @@ describe("AdUnit", () => {
         '[{"w":300,"h":250},{"invalid":true},{"w":"string","h":90}]',
       );
       expect(element.format).toEqual([{ w: 300, h: 250 }]);
+    });
+
+    test("returns null when all format entries are invalid", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("format", '[{"x":300},{"y":250}]');
+      expect(element.format).toBeNull();
     });
   });
 
@@ -264,6 +278,26 @@ describe("AdUnit", () => {
       container.appendChild(element);
       element.setAttribute("code", "new-code");
       expect(element.shadowRoot?.innerHTML).toContain("<slot>");
+    });
+
+    test("does not re-render when same attribute value is set", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      element.setAttribute("code", "test-code");
+
+      const renderSpy = spyOn(element, "render");
+      element.setAttribute("code", "test-code");
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    test("does not render when attribute changes on disconnected element", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      container.removeChild(element);
+
+      const renderSpy = spyOn(element, "render");
+      element.setAttribute("code", "new-code");
+      expect(renderSpy).not.toHaveBeenCalled();
     });
   });
 });

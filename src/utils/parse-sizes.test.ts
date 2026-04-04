@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { parseSizes, serializeSizes } from "./parse-sizes";
 
 describe("parseSizes", () => {
@@ -50,6 +50,41 @@ describe("parseSizes", () => {
 
   test("returns empty array for empty string", () => {
     expect(parseSizes("")).toEqual([]);
+  });
+
+  test("skips invalid WxH entries with trailing comma", () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    expect(parseSizes("300x250,")).toEqual([[300, 250]]);
+    warnSpy.mockRestore();
+  });
+
+  test("returns empty array for non-numeric WxH", () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    expect(parseSizes("abcxdef")).toEqual([]);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  test("skips entries with zero dimensions", () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    expect(parseSizes("0x250")).toEqual([]);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  test("skips entries with negative dimensions", () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    expect(parseSizes("-300x250")).toEqual([]);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  test("warns and falls through on invalid JSON", () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    // Invalid JSON with opening bracket triggers JSON path first
+    parseSizes("[[300,250]");
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 
