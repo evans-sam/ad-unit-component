@@ -22,15 +22,35 @@ export function parseSizes(value: string | null | undefined): number[][] {
         }
         return parsed as number[][];
       }
-    } catch {
-      // Fall through to other formats
+    } catch (e) {
+      console.warn(
+        "[ad-unit] parseSizes: invalid JSON, falling through to WxH parser",
+        e,
+      );
     }
   }
 
   // Parse "300x250" or "300x250,728x90" format
-  return trimmed.split(",").map((size) => {
+  return trimmed.split(",").flatMap((size) => {
     const parts = size.trim().toLowerCase().split("x").map(Number);
-    return [parts[0] ?? 0, parts[1] ?? 0];
+    const w = parts[0];
+    const h = parts[1];
+    if (
+      w === undefined ||
+      h === undefined ||
+      !Number.isFinite(w) ||
+      !Number.isFinite(h) ||
+      w <= 0 ||
+      h <= 0
+    ) {
+      if (size.trim() !== "") {
+        console.warn(
+          `[ad-unit] parseSizes: skipping invalid size "${size.trim()}"`,
+        );
+      }
+      return [];
+    }
+    return [[w, h]];
   });
 }
 

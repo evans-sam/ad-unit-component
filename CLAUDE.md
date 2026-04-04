@@ -130,32 +130,28 @@ bun run lint:fix    # Auto-fix lint issues
 
 ## Architecture
 
-This is a Prebid.js web component library that provides declarative HTML elements for ad unit configuration.
+This is a vendor-agnostic ad unit web component library. The `<ad-unit>` custom element manages ad slot configuration declaratively via HTML attributes. Vendor-specific behavior (Prebid, GAM, etc.) is handled by external adapters that interact with the component's public property/attribute API.
 
 ### Core Components
 
-- **`<ad-unit>`** (`src/ad-unit.ts`) - Main component that represents a Prebid ad unit. Self-registers with `window.pbjs` on connect/disconnect. Uses Shadow DOM with a slot for content projection.
-
-- **`<ad-bid>`** (`src/ad-bid.ts`) - Child component for declarative bid configuration. Converts kebab-case attributes to camelCase params (e.g., `placement-id` → `placementId`). Automatically parses numeric values.
+- **`<ad-unit>`** (`src/ad-unit.ts`) - Main component that manages ad unit configuration. Uses Shadow DOM with a slot for content projection. Reflects attributes (`code`, `sizes`, `format`, `pos`, `name`, `gpid`) as typed properties. Vendor-agnostic — adapters read properties and subscribe to attribute changes externally.
 
 ### Usage Pattern
 
 ```html
-<ad-unit code="header-ad" sizes="728x90,970x250" gpid="/1234/homepage/header">
-  <ad-bid bidder="appnexus" placement-id="123456"></ad-bid>
-  <ad-bid bidder="rubicon" account-id="1001" site-id="2002"></ad-bid>
+<ad-unit code="header-ad" sizes="728x90,970x250" pos="1" gpid="/1234/homepage/header">
 </ad-unit>
 ```
 
 ### Key Files
 
-- `src/types.ts` - Prebid.js TypeScript types and `window.pbjs` global declaration
+- `src/types.ts` - OpenRTB-aligned TypeScript types (`BannerFormat`, `BannerPosition`, `BannerMediaType`, `MediaTypes`) used as adapter contracts
 - `src/utils/parse-sizes.ts` - Size string parser supporting `"300x250,728x90"` and JSON array formats
 - `build.ts` - Bun bundler configuration (ESM, minified, inline sourcemaps)
 
 ### Testing
 
-Tests use `bun:test` with `@happy-dom/global-registrator` for DOM APIs. Tests mock `window.pbjs` to verify Prebid integration.
+Tests use `bun:test` with `@happy-dom/global-registrator` for DOM APIs. Tests verify property reflection, attribute parsing, lifecycle behavior, and vendor decoupling (ensuring no Prebid references remain).
 
 ## Code Style
 

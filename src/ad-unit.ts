@@ -88,7 +88,11 @@ export class AdUnit extends HTMLElement {
     const value = this.getAttribute("pos");
     if (value === null) return null;
     const parsed = Number.parseInt(value, 10);
-    return Number.isNaN(parsed) ? null : parsed;
+    if (Number.isNaN(parsed)) {
+      console.warn(`[ad-unit] pos: invalid value "${value}", expected integer`);
+      return null;
+    }
+    return parsed;
   }
 
   set pos(value: number | null) {
@@ -107,7 +111,7 @@ export class AdUnit extends HTMLElement {
   }
 
   set name(value: string | null) {
-    if (value) {
+    if (value !== null) {
       this.setAttribute("name", value);
     } else {
       this.removeAttribute("name");
@@ -124,16 +128,20 @@ export class AdUnit extends HTMLElement {
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
-        return parsed.filter(
+        const filtered = parsed.filter(
           (f): f is BannerFormat =>
             typeof f === "object" &&
             f !== null &&
             typeof f.w === "number" &&
             typeof f.h === "number",
         );
+        return filtered.length > 0 ? filtered : null;
       }
-    } catch {
-      console.warn(`[ad-unit] Invalid format JSON for "${this.code}"`);
+    } catch (e) {
+      console.warn(
+        `[ad-unit] Invalid format JSON for "${this.code}": ${JSON.stringify(this.getAttribute("format"))}`,
+        e,
+      );
     }
     return null;
   }
@@ -154,7 +162,10 @@ export class AdUnit extends HTMLElement {
     this.render();
   }
 
-  disconnectedCallback() {}
+  disconnectedCallback() {
+    // Extension point: adapters may override or observe this lifecycle hook
+    // to clean up subscriptions when the element is removed from the DOM.
+  }
 
   attributeChangedCallback(
     _name: string,
