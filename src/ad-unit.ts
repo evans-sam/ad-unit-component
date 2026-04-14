@@ -1,6 +1,31 @@
 import type { BannerFormat } from "./types";
 import { parseSizes, serializeSizes } from "./utils/parse-sizes";
 
+const DEFAULT_FETCH_MARGIN = "200%";
+const DEFAULT_RENDER_MARGIN = "150%";
+
+interface ParsedMargin {
+  value: number;
+  unit: "px" | "%";
+}
+
+function parseMargin(
+  margin: string,
+  label: string,
+  code: string,
+): ParsedMargin {
+  const match = margin.match(/^(-?\d+(?:\.\d+)?)(px|%)$/);
+  if (!match?.[1] || !match[2]) {
+    console.warn(
+      `[ad-unit "${code}"] Could not parse ${label} "${margin}" for comparison, expected a number followed by px or %. Falling back to default.`,
+    );
+    return label === "fetch-margin"
+      ? { value: 200, unit: "%" }
+      : { value: 150, unit: "%" };
+  }
+  return { value: Number.parseFloat(match[1]), unit: match[2] as "px" | "%" };
+}
+
 /**
  * AdUnit web component - declarative ad unit lifecycle manager
  *
@@ -20,6 +45,9 @@ import { parseSizes, serializeSizes } from "./utils/parse-sizes";
  * @attr pos - OpenRTB position (0=unknown, 1=ATF, 3=BTF, 4=header, 5=footer, 6=sidebar, 7=fullscreen)
  * @attr name - Banner name for debugging
  * @attr gpid - Global Placement ID for first-party data
+ * @attr loading - "eager" (default) or "lazy" for IntersectionObserver-based viewport detection
+ * @attr fetch-margin - rootMargin for the fetch zone observer (default "200%")
+ * @attr render-margin - rootMargin for the render zone observer (default "150%")
  */
 export class AdUnit extends HTMLElement {
   static observedAttributes = [
@@ -29,9 +57,16 @@ export class AdUnit extends HTMLElement {
     "gpid",
     "pos",
     "name",
+    "loading",
+    "fetch-margin",
+    "render-margin",
   ];
 
   #container: HTMLDivElement;
+  #fetchObserver: IntersectionObserver | null = null;
+  #renderObserver: IntersectionObserver | null = null;
+  #fetchFired = false;
+  #renderFired = false;
 
   constructor() {
     super();
@@ -171,15 +206,128 @@ export class AdUnit extends HTMLElement {
     }
   }
 
+  get loading(): string {
+    return this.getAttribute("loading") ?? "eager";
+  }
+
+  set loading(value: string) {
+    this.setAttribute("loading", value);
+  }
+
+  get fetchMargin(): string {
+    return this.getAttribute("fetch-margin") ?? DEFAULT_FETCH_MARGIN;
+  }
+
+  set fetchMargin(value: string) {
+    this.setAttribute("fetch-margin", value);
+  }
+
+  get renderMargin(): string {
+    return this.getAttribute("render-margin") ?? DEFAULT_RENDER_MARGIN;
+  }
+
+  set renderMargin(value: string) {
+    this.setAttribute("render-margin", value);
+  }
+
   // --- Lifecycle ---
 
   connectedCallback() {
     this.render();
     this.#dispatchLifecycle("ad-unit:connected");
+
+    if (this.loading === "lazy") {
+      this.#setupObservers();
+    } else {
+      this.#dispatchLifecycle("ad-unit:fetch");
+      this.#dispatchLifecycle("ad-unit:render");
+    }
   }
 
   disconnectedCallback() {
+    this.#teardownObservers();
     this.#dispatchLifecycle("ad-unit:disconnected");
+  }
+
+  #setupObservers() {
+    this.#fetchFired = false;
+    this.#renderFired = false;
+
+    let fetchMargin = this.fetchMargin;
+    const renderMargin = this.renderMargin;
+
+    const fetchParsed = parseMargin(fetchMargin, "fetch-margin", this.code);
+    const renderParsed = parseMargin(renderMargin, "render-margin", this.code);
+    if (
+      fetchParsed.unit === renderParsed.unit &&
+      fetchParsed.value < renderParsed.value
+    ) {
+      console.warn(
+        `[ad-unit "${this.code}"] fetch-margin (${fetchMargin}) is less than render-margin (${renderMargin}), clamping fetch-margin to render-margin`,
+      );
+      fetchMargin = renderMargin;
+    }
+
+    this.#fetchObserver = this.#createObserver(
+      fetchMargin,
+      "fetch-margin",
+      () => {
+        if (this.#fetchFired) return;
+        this.#fetchFired = true;
+        this.#fetchObserver?.unobserve(this);
+        this.#dispatchLifecycle("ad-unit:fetch");
+      },
+    );
+
+    this.#renderObserver = this.#createObserver(
+      renderMargin,
+      "render-margin",
+      () => {
+        if (this.#renderFired) return;
+        if (!this.#fetchFired) {
+          this.#fetchFired = true;
+          this.#fetchObserver?.unobserve(this);
+          this.#dispatchLifecycle("ad-unit:fetch");
+        }
+        this.#renderFired = true;
+        this.#renderObserver?.unobserve(this);
+        this.#dispatchLifecycle("ad-unit:render");
+      },
+    );
+
+    this.#fetchObserver.observe(this);
+    this.#renderObserver.observe(this);
+  }
+
+  #createObserver(
+    margin: string,
+    attrName: string,
+    onIntersect: () => void,
+  ): IntersectionObserver {
+    try {
+      return new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              onIntersect();
+              return;
+            }
+          }
+        },
+        { rootMargin: margin },
+      );
+    } catch (e) {
+      throw new Error(
+        `[ad-unit "${this.code}"] Invalid ${attrName} "${margin}": ${e instanceof Error ? e.message : e}`,
+      );
+    }
+  }
+
+  #teardownObservers() {
+    this.#fetchObserver?.disconnect();
+    this.#renderObserver?.disconnect();
+    this.#fetchObserver = null;
+    this.#renderObserver = null;
   }
 
   #dispatchLifecycle(type: string) {
