@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Lifecycle scenario · ad-unit demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+            background: #f8fafc;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        .eyebrow {
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 0 0 0.5rem;
+        }
+
+        .lede {
+            color: #475569;
+            margin: 0;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        section {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        section h2 {
+            margin: 0 0 1rem;
+            font-size: 1rem;
+            color: #0f172a;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .ad-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .ad-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .ad-item__label {
+            font-size: 0.6875rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font: inherit;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #0f172a;
+            background: #0f172a;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1e293b;
+        }
+
+        button.secondary {
+            background: white;
+            color: #0f172a;
+        }
+
+        button.secondary:hover {
+            background: #f1f5f9;
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            border-color: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .back {
+            display: inline-block;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .back:hover {
+            color: #0f172a;
+        }
+
+        aside {
+            position: sticky;
+            top: 2rem;
+        }
+
+        aside event-log {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<a class="back" href="/">← back to demo index</a>
+
+<header>
+    <p class="eyebrow">Scenario</p>
+    <h1>Lifecycle</h1>
+    <p class="lede">
+        <code>ad-unit:connected</code> / <code>ad-unit:disconnected</code> fire through shadow DOM.
+        The mock adapter paints a pending state on connect, then repaints with a fake bid price after a 500&thinsp;ms
+        auction.
+        Add or remove units to watch the lifecycle log grow.
+    </p>
+</header>
+
+<div class="layout">
+    <div>
+        <section>
+            <h2>Initial units</h2>
+            <div class="ad-grid" id="static-units">
+                <div class="ad-item">
+                    <span class="ad-item__label">Leaderboard · 728×90</span>
+                    <ad-unit code="header-leaderboard" gpid="/1234/homepage/header" pos="1" sizes="728x90">
+                        Header Leaderboard
+                    </ad-unit>
+                </div>
+                <div class="ad-item">
+                    <span class="ad-item__label">Medium rectangle · 300×250</span>
+                    <ad-unit code="sidebar-mrec" gpid="/1234/homepage/sidebar" pos="6" sizes="300x250">
+                        Sidebar MREC
+                    </ad-unit>
+                </div>
+                <div class="ad-item">
+                    <span class="ad-item__label">Flex banner (format) · 336×280</span>
+                    <ad-unit code="flex-banner" format='[{"w":336,"h":280}]' pos="3">
+                        Flex Banner
+                    </ad-unit>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Dynamic units</h2>
+            <div class="controls">
+                <button id="add-btn" type="button">Add ad unit</button>
+                <button class="secondary" id="remove-btn" type="button">Remove last</button>
+            </div>
+            <div class="ad-grid" id="dynamic-units" style="margin-top:1rem;"></div>
+        </section>
+    </div>
+
+    <aside>
+        <event-log></event-log>
+    </aside>
+</div>
+
+<script src="./lifecycle.ts" type="module"></script>
+</body>
+</html>

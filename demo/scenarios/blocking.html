@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Blocking scenario — stub</title>
+    <link href="../stub.css" rel="stylesheet">
+</head>
+<body>
+<main class="stub">
+    <p class="stub__eyebrow">Scenario · stub</p>
+    <h1>preventDefault / proceed</h1>
+    <p>
+        This scenario will demonstrate a listener calling
+        <code>event.preventDefault()</code> on <code>ad-unit:fetch</code> to hold
+        the lifecycle, then calling <code>unit.proceed()</code> to release it
+        — the coordination hook adapters will use to wait on bid responses.
+    </p>
+    <p>
+        Lands with issue <a href="https://github.com/evans-sam/ad-unit-component/issues/5">#5 — preventDefault()
+        lifecycle blocking and proceed() method</a>.
+    </p>
+    <p><a class="stub__back" href="/">← back to demo index</a></p>
+</main>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ad Unit Component - Demo</title>
+  <title>ad-unit demo harness</title>
   <style>
     * {
       box-sizing: border-box;
@@ -11,183 +11,139 @@
 
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      max-width: 1200px;
+      max-width: 720px;
       margin: 0 auto;
-      padding: 2rem;
-      background: #f5f5f5;
+      padding: 4rem 2rem;
+      background: #f8fafc;
+      color: #0f172a;
+      line-height: 1.6;
     }
 
     h1 {
-      margin-bottom: 0.5rem;
+      margin: 0 0 0.5rem;
     }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 2rem;
+    .lede {
+      color: #475569;
+      margin: 0 0 2rem;
     }
 
-    .demo-section {
+    ol.scenarios {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .scenario {
       background: white;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-
-    .demo-section h2 {
-      margin-top: 0;
-      font-size: 1.25rem;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 0.5rem;
-    }
-
-    ad-unit {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border: 2px solid #5a67d8;
+      padding: 1rem 1.25rem;
       display: flex;
       align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 0.875rem;
-      font-weight: 500;
+      justify-content: space-between;
+      gap: 1rem;
     }
 
-    /* Common ad sizes */
-    .leaderboard {
-      width: 728px;
-      height: 90px;
+    .scenario a {
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 600;
     }
 
-    .medium-rectangle {
-      width: 300px;
-      height: 250px;
+    .scenario a:hover {
+      color: #2563eb;
     }
 
-    .wide-skyscraper {
-      width: 160px;
-      height: 600px;
+    .scenario__meta {
+      color: #64748b;
+      font-size: 0.8125rem;
+      margin-top: 0.15rem;
     }
 
-    .mobile-banner {
-      width: 320px;
-      height: 50px;
-    }
-
-    .ad-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.5rem;
-    }
-
-    .ad-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .ad-label {
-      font-size: 0.75rem;
-      color: #888;
+    .status {
+      font-size: 0.6875rem;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      white-space: nowrap;
     }
 
-    pre {
-      background: #1a1a2e;
-      color: #a5d6ff;
-      padding: 1rem;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-size: 0.8rem;
-      line-height: 1.5;
+    .status--working {
+      background: #dcfce7;
+      color: #166534;
     }
 
-    .code-label {
-      background: #374151;
-      color: #9ca3af;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px 4px 0 0;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      display: inline-block;
-      margin-bottom: -1px;
+    .status--stub {
+      background: #fef3c7;
+      color: #92400e;
     }
 
-    #debug-output {
-      font-family: monospace;
-      font-size: 0.8rem;
-      background: #1a1a2e;
-      color: #a5d6ff;
-      padding: 1rem;
-      border-radius: 6px;
-      white-space: pre-wrap;
-      max-height: 400px;
-      overflow-y: auto;
+    footer {
+      margin-top: 3rem;
+      color: #94a3b8;
+      font-size: 0.8125rem;
+    }
+
+    footer code {
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
-  <h1>Ad Unit Component Demo</h1>
-  <p class="subtitle">Declarative ad unit lifecycle management with web components</p>
+<h1>ad-unit demo harness</h1>
+<p class="lede">
+  Scenario-based demo pages that double as hand-inspectable acceptance tests.
+  Each scenario exercises one slice of the <code>&lt;ad-unit&gt;</code> public API
+  through the shared mock adapter.
+</p>
 
-  <div class="demo-section">
-    <h2>Standard Sizes</h2>
-    <p>Declare ad units with <code>code</code>, <code>sizes</code>, and optional <code>gpid</code>/<code>pos</code> attributes:</p>
-
-    <div class="ad-grid">
-      <div class="ad-item">
-        <span class="ad-label">Leaderboard (728x90) - Above the fold</span>
-        <ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header" pos="1" name="header-leaderboard-atf" class="leaderboard">
-          Header Leaderboard
-        </ad-unit>
+<ol class="scenarios">
+  <li class="scenario">
+    <div>
+      <a href="/scenarios/lifecycle">Lifecycle</a>
+      <div class="scenario__meta">connected / disconnected · dynamic add / remove</div>
       </div>
-
-      <div class="ad-item">
-        <span class="ad-label">Medium Rectangle (300x250) - Sidebar</span>
-        <ad-unit code="sidebar-rectangle" sizes="300x250,300x600" gpid="/1234/homepage/sidebar" pos="6" name="sidebar-mrec" class="medium-rectangle">
-          Sidebar Ad
-        </ad-unit>
-      </div>
+    <span class="status status--working">working</span>
+  </li>
+  <li class="scenario">
+    <div>
+      <a href="/scenarios/viewport">Viewport entry</a>
+      <div class="scenario__meta">fetch / render zones · issue #4</div>
     </div>
-
-    <span class="code-label">HTML</span>
-    <pre>&lt;ad-unit code="header-leaderboard" sizes="728x90" gpid="/1234/homepage/header" pos="1"&gt;
-&lt;/ad-unit&gt;
-
-&lt;!-- pos values: 0=unknown, 1=ATF, 3=BTF, 4=header, 5=footer, 6=sidebar, 7=fullscreen --&gt;</pre>
-  </div>
-
-  <div class="demo-section">
-    <h2>ORTB Format (Alternative to Sizes)</h2>
-    <p>Use the <code>format</code> attribute for ORTB-style sizing with width/height objects:</p>
-
-    <div class="ad-grid">
-      <div class="ad-item">
-        <span class="ad-label">Flexible Banner (format)</span>
-        <ad-unit
-          code="flex-banner"
-          format='[{"w":300,"h":250},{"w":320,"h":50}]'
-          gpid="/1234/mobile/flex"
-          pos="3"
-          name="flex-banner-btf"
-          class="medium-rectangle">
-          Flex Banner
-        </ad-unit>
-      </div>
+    <span class="status status--stub">stub</span>
+  </li>
+  <li class="scenario">
+    <div>
+      <a href="/scenarios/blocking">preventDefault / proceed</a>
+      <div class="scenario__meta">lifecycle hold & release · issue #5</div>
     </div>
+    <span class="status status--stub">stub</span>
+  </li>
+  <li class="scenario">
+    <div>
+      <a href="/scenarios/refresh">refresh()</a>
+      <div class="scenario__meta">re-auction a live unit · issue #6</div>
+      </div>
+    <span class="status status--stub">stub</span>
+  </li>
+  <li class="scenario">
+    <div>
+      <a href="/scenarios/registry">Adapter registry</a>
+      <div class="scenario__meta">formal adapter interface · issue #7</div>
+    </div>
+    <span class="status status--stub">stub</span>
+  </li>
+</ol>
 
-    <span class="code-label">HTML</span>
-    <pre>&lt;ad-unit code="flex-banner" format='[{"w":300,"h":250},{"w":320,"h":50}]' pos="3"&gt;
-&lt;/ad-unit&gt;
-
-&lt;!-- format takes precedence over sizes if both are provided --&gt;</pre>
-  </div>
-
-  <div class="demo-section">
-    <h2>Ad Unit Attributes</h2>
-    <div id="debug-output">Loading...</div>
-  </div>
-
-  <script type="module" src="./demo.ts"></script>
+<footer>
+  Plan: <code>plans/demo-test-harness.md</code>
+</footer>
 </body>
 </html>
