@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { AdUnit } from "./ad-unit";
+import { AdUnit, AdUnitLifecycleEvent } from "./ad-unit";
 
 class MockIntersectionObserver {
   static instances: MockIntersectionObserver[] = [];
@@ -375,7 +375,7 @@ describe("AdUnit", () => {
       );
     });
 
-    test("ad-unit:connected is bubbles, composed, cancelable", () => {
+    test("ad-unit:connected is bubbles and composed, not cancelable", () => {
       const element = document.createElement("ad-unit") as AdUnit;
       let received: CustomEvent | null = null;
       element.addEventListener("ad-unit:connected", (e) => {
@@ -387,10 +387,10 @@ describe("AdUnit", () => {
       const e = received as unknown as CustomEvent;
       expect(e.bubbles).toBe(true);
       expect(e.composed).toBe(true);
-      expect(e.cancelable).toBe(true);
+      expect(e.cancelable).toBe(false);
     });
 
-    test("ad-unit:disconnected is bubbles, composed, cancelable", () => {
+    test("ad-unit:disconnected is bubbles and composed, not cancelable", () => {
       const element = document.createElement("ad-unit") as AdUnit;
       container.appendChild(element);
 
@@ -404,7 +404,29 @@ describe("AdUnit", () => {
       const e = received as unknown as CustomEvent;
       expect(e.bubbles).toBe(true);
       expect(e.composed).toBe(true);
-      expect(e.cancelable).toBe(true);
+      expect(e.cancelable).toBe(false);
+    });
+
+    test("lifecycle events are AdUnitLifecycleEvent instances", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let connectedEvent: Event | null = null;
+      let fetchEvent: Event | null = null;
+      let renderEvent: Event | null = null;
+      element.addEventListener("ad-unit:connected", (e) => {
+        connectedEvent = e;
+      });
+      element.addEventListener("ad-unit:fetch", (e) => {
+        fetchEvent = e;
+      });
+      element.addEventListener("ad-unit:render", (e) => {
+        renderEvent = e;
+      });
+
+      container.appendChild(element);
+
+      expect(connectedEvent).toBeInstanceOf(AdUnitLifecycleEvent);
+      expect(fetchEvent).toBeInstanceOf(AdUnitLifecycleEvent);
+      expect(renderEvent).toBeInstanceOf(AdUnitLifecycleEvent);
     });
 
     test("document-level listener receives ad-unit:connected (bubbles + composed)", () => {
@@ -670,7 +692,7 @@ describe("AdUnit", () => {
       expect(d.container).toBe(element.container);
     });
 
-    test("fetch and render events are bubbles, composed, cancelable", () => {
+    test("fetch and render events are bubbles and composed, not cancelable", () => {
       const element = document.createElement("ad-unit") as AdUnit;
       const events: CustomEvent[] = [];
       element.addEventListener("ad-unit:fetch", (e) =>
@@ -686,18 +708,30 @@ describe("AdUnit", () => {
       for (const e of events) {
         expect(e.bubbles).toBe(true);
         expect(e.composed).toBe(true);
-        expect(e.cancelable).toBe(true);
+        expect(e.cancelable).toBe(false);
       }
     });
   });
 
   describe("lazy mode", () => {
-    test("creates two IntersectionObservers on connect", () => {
+    test("creates fetch-zone observer on connect, render-zone observer after fetch triggers", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       container.appendChild(element);
 
+      expect(MockIntersectionObserver.instances).toHaveLength(1);
+      expect(MockIntersectionObserver.instances[0].options.rootMargin).toBe(
+        "200%",
+      );
+
+      MockIntersectionObserver.instances[0].trigger(element, true);
+      // Wait two microtasks for promise resolution to propagate.
+      await Promise.resolve();
+      await Promise.resolve();
       expect(MockIntersectionObserver.instances).toHaveLength(2);
+      expect(MockIntersectionObserver.instances[1].options.rootMargin).toBe(
+        "150%",
+      );
     });
 
     test("does not fire fetch or render synchronously on connect", () => {
@@ -712,7 +746,7 @@ describe("AdUnit", () => {
       expect(events).toEqual([]);
     });
 
-    test("fires ad-unit:fetch when fetch observer triggers", () => {
+    test("fires ad-unit:fetch when fetch observer triggers", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       element.setAttribute("code", "test-ad");
@@ -725,12 +759,14 @@ describe("AdUnit", () => {
       container.appendChild(element);
       const fetchObserver = MockIntersectionObserver.instances[0];
       fetchObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(received).not.toBeNull();
       expect((received as unknown as CustomEvent).detail.code).toBe("test-ad");
     });
 
-    test("fires ad-unit:render when render observer triggers", () => {
+    test("fires ad-unit:render when render observer triggers", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       element.setAttribute("code", "test-ad");
@@ -741,36 +777,54 @@ describe("AdUnit", () => {
       });
 
       container.appendChild(element);
-      const renderObserver = MockIntersectionObserver.instances[1];
-      renderObserver.trigger(element, true);
+      // Enter fetch zone first
+      MockIntersectionObserver.instances[0].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+      // Now enter render zone
+      MockIntersectionObserver.instances[1].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(received).not.toBeNull();
       expect((received as unknown as CustomEvent).detail.code).toBe("test-ad");
     });
 
-    test("uses default margins (200% fetch, 150% render)", () => {
+    test("uses default margins (200% fetch, 150% render)", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       container.appendChild(element);
 
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
-      expect(fetchObs.options.rootMargin).toBe("200%");
-      expect(renderObs.options.rootMargin).toBe("150%");
+      const fetchObserver = MockIntersectionObserver.instances[0];
+      expect(fetchObserver.options.rootMargin).toBe("200%");
+
+      fetchObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObserver = MockIntersectionObserver.instances[1];
+      expect(renderObserver.options.rootMargin).toBe("150%");
     });
 
-    test("uses custom margins from attributes", () => {
+    test("uses custom margins from attributes", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       element.setAttribute("fetch-margin", "500px");
       element.setAttribute("render-margin", "100px");
       container.appendChild(element);
 
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
-      expect(fetchObs.options.rootMargin).toBe("500px");
-      expect(renderObs.options.rootMargin).toBe("100px");
+      const fetchObserver = MockIntersectionObserver.instances[0];
+      expect(fetchObserver.options.rootMargin).toBe("500px");
+
+      fetchObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObserver = MockIntersectionObserver.instances[1];
+      expect(renderObserver.options.rootMargin).toBe("100px");
     });
 
-    test("each event fires at most once", () => {
+    test("each event fires at most once", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       let fetchCount = 0;
@@ -779,45 +833,55 @@ describe("AdUnit", () => {
       element.addEventListener("ad-unit:render", () => renderCount++);
 
       container.appendChild(element);
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
+      const fetchObserver = MockIntersectionObserver.instances[0];
 
-      fetchObs.trigger(element, true);
-      fetchObs.trigger(element, true);
-      renderObs.trigger(element, true);
-      renderObs.trigger(element, true);
+      fetchObserver.trigger(element, true);
+      fetchObserver.trigger(element, true); // second trigger should no-op (observer disconnected)
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObserver = MockIntersectionObserver.instances[1];
+      renderObserver.trigger(element, true);
+      renderObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(fetchCount).toBe(1);
       expect(renderCount).toBe(1);
     });
 
-    test("unobserves after event fires", () => {
+    test("observer is disconnected after zone entered", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       container.appendChild(element);
 
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
-      expect(fetchObs.observed.has(element)).toBe(true);
+      const fetchObserver = MockIntersectionObserver.instances[0];
+      expect(fetchObserver.observed.has(element)).toBe(true);
 
-      fetchObs.trigger(element, true);
-      expect(fetchObs.observed.has(element)).toBe(false);
+      fetchObserver.trigger(element, true);
+      expect(fetchObserver.disconnected).toBe(true);
 
-      renderObs.trigger(element, true);
-      expect(renderObs.observed.has(element)).toBe(false);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObserver = MockIntersectionObserver.instances[1];
+      expect(renderObserver.observed.has(element)).toBe(true);
+      renderObserver.trigger(element, true);
+      expect(renderObserver.disconnected).toBe(true);
     });
 
-    test("observers disconnected on element removal", () => {
+    test("zone observers disconnected on element removal", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       container.appendChild(element);
 
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
+      const fetchObserver = MockIntersectionObserver.instances[0];
       container.removeChild(element);
 
-      expect(fetchObs.disconnected).toBe(true);
-      expect(renderObs.disconnected).toBe(true);
+      expect(fetchObserver.disconnected).toBe(true);
     });
 
-    test("reconnect resets lifecycle — events fire again", () => {
+    test("reconnect resets lifecycle — events fire again", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       let fetchCount = 0;
@@ -827,23 +891,31 @@ describe("AdUnit", () => {
 
       container.appendChild(element);
       MockIntersectionObserver.instances[0].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
       MockIntersectionObserver.instances[1].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
       expect(fetchCount).toBe(1);
       expect(renderCount).toBe(1);
 
       container.removeChild(element);
       container.appendChild(element);
 
-      const newFetchObs = MockIntersectionObserver.instances[2];
-      const newRenderObs = MockIntersectionObserver.instances[3];
-      newFetchObs.trigger(element, true);
-      newRenderObs.trigger(element, true);
+      const newFetchObserver = MockIntersectionObserver.instances[2];
+      newFetchObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+      const newRenderObserver = MockIntersectionObserver.instances[3];
+      newRenderObserver.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(fetchCount).toBe(2);
       expect(renderCount).toBe(2);
     });
 
-    test("element already in view: fetch fires before render", () => {
+    test("element already in view: fetch fires before render", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       const order: string[] = [];
@@ -851,13 +923,17 @@ describe("AdUnit", () => {
       element.addEventListener("ad-unit:render", () => order.push("render"));
 
       container.appendChild(element);
-      const renderObserver = MockIntersectionObserver.instances[1];
-      renderObserver.trigger(element, true);
+      MockIntersectionObserver.instances[0].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+      MockIntersectionObserver.instances[1].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(order).toEqual(["fetch", "render"]);
     });
 
-    test("non-intersecting entries are ignored", () => {
+    test("non-intersecting entries are ignored", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       let fetchCount = 0;
@@ -865,13 +941,51 @@ describe("AdUnit", () => {
 
       container.appendChild(element);
       MockIntersectionObserver.instances[0].trigger(element, false);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(fetchCount).toBe(0);
+    });
+
+    test("lazy loading composes with user waitUntil on fetch", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("loading", "lazy");
+
+      let resolveAuction: () => void;
+      const auction = new Promise<void>((r) => {
+        resolveAuction = r;
+      });
+
+      let renderFired = false;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(auction);
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderFired = true;
+      });
+
+      container.appendChild(element);
+      // Enter fetch zone
+      MockIntersectionObserver.instances[0].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+      // Enter render zone — but auction still pending
+      MockIntersectionObserver.instances[1].trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(renderFired).toBe(false);
+
+      resolveAuction!();
+      await auction;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderFired).toBe(true);
     });
   });
 
   describe("margin validation", () => {
-    test("warns and clamps when fetch margin < render margin (same unit)", () => {
+    test("warns and clamps when fetch margin < render margin (same unit)", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       element.setAttribute("code", "test-ad");
@@ -882,8 +996,14 @@ describe("AdUnit", () => {
       container.appendChild(element);
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
+      const fetchObs = MockIntersectionObserver.instances[0];
       expect(fetchObs.options.rootMargin).toBe("100%");
+
+      fetchObs.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObs = MockIntersectionObserver.instances[1];
       expect(renderObs.options.rootMargin).toBe("100%");
       warnSpy.mockRestore();
     });
@@ -903,7 +1023,7 @@ describe("AdUnit", () => {
       warnSpy.mockRestore();
     });
 
-    test("skips validation when units differ", () => {
+    test("skips validation when units differ", async () => {
       const element = document.createElement("ad-unit") as AdUnit;
       element.setAttribute("loading", "lazy");
       element.setAttribute("fetch-margin", "50px");
@@ -913,38 +1033,439 @@ describe("AdUnit", () => {
       container.appendChild(element);
 
       expect(warnSpy).not.toHaveBeenCalled();
-      const [fetchObs, renderObs] = MockIntersectionObserver.instances;
+      const fetchObs = MockIntersectionObserver.instances[0];
       expect(fetchObs.options.rootMargin).toBe("50px");
+
+      fetchObs.trigger(element, true);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const renderObs = MockIntersectionObserver.instances[1];
       expect(renderObs.options.rootMargin).toBe("100%");
       warnSpy.mockRestore();
     });
 
-    test("invalid margin throws with helpful context", () => {
-      const OrigMock = globalThis.IntersectionObserver;
-      globalThis.IntersectionObserver = class ThrowingObserver {
-        constructor(_cb: unknown, options: IntersectionObserverInit) {
+    test("invalid fetch-margin surfaces via ad-unit:error", async () => {
+      const OriginalIO = globalThis.IntersectionObserver;
+      globalThis.IntersectionObserver = class {
+        constructor(
+          _cb: IntersectionObserverCallback,
+          options: IntersectionObserverInit,
+        ) {
           throw new Error(
-            `rootMargin must be specified in pixels or percent: ${options.rootMargin}`,
+            `Failed to construct 'IntersectionObserver': '${options.rootMargin}' is not a valid value`,
           );
-        }
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-        takeRecords() {
-          return [];
         }
       } as unknown as typeof IntersectionObserver;
 
+      try {
+        const element = document.createElement("ad-unit") as AdUnit;
+        element.setAttribute("code", "test-ad");
+        element.setAttribute("loading", "lazy");
+        element.setAttribute("fetch-margin", "banana");
+        element.setAttribute("render-margin", "banana");
+
+        let errorDetail: { stage: string; error: unknown } | null = null;
+        element.addEventListener("ad-unit:error", (e) => {
+          errorDetail = (e as CustomEvent).detail;
+        });
+
+        container.appendChild(element);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(errorDetail).not.toBeNull();
+        expect(errorDetail!.stage).toBe("connected");
+        expect(errorDetail!.error).toBeInstanceOf(Error);
+        expect((errorDetail!.error as Error).message).toContain(
+          `[ad-unit "test-ad"] Invalid fetch-margin "banana":`,
+        );
+      } finally {
+        globalThis.IntersectionObserver = OriginalIO;
+      }
+    });
+  });
+
+  describe("waitUntil (eager mode)", () => {
+    test("zero waiters: all three events fire synchronously", () => {
       const element = document.createElement("ad-unit") as AdUnit;
-      element.setAttribute("loading", "lazy");
-      element.setAttribute("code", "test-ad");
-      element.setAttribute("fetch-margin", "banana");
-
-      expect(() => container.appendChild(element)).toThrow(
-        '[ad-unit "test-ad"] Invalid fetch-margin "banana"',
+      const order: string[] = [];
+      element.addEventListener("ad-unit:connected", () =>
+        order.push("connected"),
       );
+      element.addEventListener("ad-unit:fetch", () => order.push("fetch"));
+      element.addEventListener("ad-unit:render", () => order.push("render"));
 
-      globalThis.IntersectionObserver = OrigMock;
+      container.appendChild(element);
+
+      // All three should have fired synchronously in connectedCallback.
+      expect(order).toEqual(["connected", "fetch", "render"]);
+    });
+
+    test("waitUntil on connected defers fetch until promise resolves", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:connected", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      container.appendChild(element);
+      expect(fetchFired).toBe(false); // async path
+
+      resolve!();
+      await gate;
+      await Promise.resolve(); // let chained then run
+
+      expect(fetchFired).toBe(true);
+    });
+
+    test("waitUntil on fetch defers render until promise resolves", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+
+      let renderFired = false;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderFired = true;
+      });
+
+      container.appendChild(element);
+      expect(renderFired).toBe(false);
+
+      resolve!();
+      await gate;
+      await Promise.resolve();
+
+      expect(renderFired).toBe(true);
+    });
+
+    test("multiple waitUntil calls compose (Promise.all semantics)", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const gateA = new Promise<void>((r) => {
+        resolveA = r;
+      });
+      const gateB = new Promise<void>((r) => {
+        resolveB = r;
+      });
+
+      let renderFired = false;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gateA);
+      });
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gateB);
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderFired = true;
+      });
+
+      container.appendChild(element);
+
+      resolveA!();
+      await gateA;
+      await Promise.resolve();
+      expect(renderFired).toBe(false); // B still pending
+
+      resolveB!();
+      await gateB;
+      await Promise.resolve();
+      expect(renderFired).toBe(true);
+    });
+
+    test("disconnect during async wait prevents subsequent stage", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:connected", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      container.appendChild(element);
+      container.removeChild(element); // disconnect before gate resolves
+
+      resolve!();
+      await gate;
+      await Promise.resolve();
+
+      expect(fetchFired).toBe(false);
+    });
+
+    test("rejection halts lifecycle and fires ad-unit:error", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      const error = new Error("bid server down");
+
+      let renderFired = false;
+      let errorDetail: { stage: string; error: unknown } | null = null;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(Promise.reject(error));
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderFired = true;
+      });
+      element.addEventListener("ad-unit:error", (e) => {
+        errorDetail = (e as CustomEvent).detail;
+      });
+
+      container.appendChild(element);
+
+      // Flush microtasks for the rejection to propagate.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderFired).toBe(false);
+      expect(errorDetail).not.toBeNull();
+      expect(errorDetail!.stage).toBe("fetch");
+      expect(errorDetail!.error).toBe(error);
+    });
+
+    test("AbortError on zone promise does not dispatch ad-unit:error", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      const abortError = new DOMException("ad-unit disconnected", "AbortError");
+
+      let errorCount = 0;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(Promise.reject(abortError));
+      });
+      element.addEventListener("ad-unit:error", () => {
+        errorCount++;
+      });
+
+      container.appendChild(element);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(errorCount).toBe(0);
+    });
+
+    test("rejection after disconnect does not dispatch ad-unit:error", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let reject!: (reason: unknown) => void;
+      const gate = new Promise<never>((_, r) => {
+        reject = r;
+      });
+      let errorCount = 0;
+
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:error", () => {
+        errorCount++;
+      });
+
+      container.appendChild(element);
+      container.removeChild(element); // sets #aborted before rejection drains
+
+      reject(new Error("disconnected race"));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(errorCount).toBe(0);
+    });
+
+    test("adUnit.blocked is false before connect", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      expect(element.blocked).toBe(false);
+    });
+
+    test("adUnit.blocked is false after sync lifecycle completes", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      expect(element.blocked).toBe(false);
+    });
+
+    test("adUnit.blocked reflects pending waitUntil", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      resolve!();
+      await gate;
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
+
+    test("adUnit.blocked is false after rejection", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(Promise.reject(new Error("x")));
+      });
+      container.appendChild(element);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
+
+    test("stage-blocked and stage-unblocked fire around pending stage", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+      const events: { type: string; stage: string }[] = [];
+      element.addEventListener("ad-unit:fetch", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:stage-blocked", (e) => {
+        events.push({
+          type: "blocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+      element.addEventListener("ad-unit:stage-unblocked", (e) => {
+        events.push({
+          type: "unblocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+
+      container.appendChild(element);
+      expect(events).toEqual([{ type: "blocked", stage: "fetch" }]);
+
+      resolve!();
+      await gate;
+      await Promise.resolve();
+
+      expect(events).toEqual([
+        { type: "blocked", stage: "fetch" },
+        { type: "unblocked", stage: "fetch" },
+      ]);
+    });
+
+    test("reconnect with no waiters clears stale blocked state", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+      const fetchHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      };
+      element.addEventListener("ad-unit:fetch", fetchHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      container.removeChild(element);
+      element.removeEventListener("ad-unit:fetch", fetchHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(false);
+
+      // Allow the stale gate to resolve — must not revive blocked state.
+      resolve!();
+      await gate;
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
+
+    test("reconnect while promise is pending does not fire stale stage-unblocked", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let resolve: () => void;
+      const gate = new Promise<void>((r) => {
+        resolve = r;
+      });
+      const fetchHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      };
+      element.addEventListener("ad-unit:fetch", fetchHandler);
+
+      const unblockedStages: string[] = [];
+      element.addEventListener("ad-unit:stage-unblocked", (e) => {
+        unblockedStages.push((e as CustomEvent).detail.stage);
+      });
+
+      container.appendChild(element);
+      container.removeChild(element);
+      element.removeEventListener("ad-unit:fetch", fetchHandler);
+      container.appendChild(element);
+
+      resolve!();
+      await gate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(unblockedStages).toEqual([]);
+    });
+  });
+
+  describe("AdUnitLifecycleEvent", () => {
+    test("is a CustomEvent subclass", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      expect(event).toBeInstanceOf(CustomEvent);
+      expect(event).toBeInstanceOf(AdUnitLifecycleEvent);
+      expect(event.type).toBe("ad-unit:fetch");
+    });
+
+    test("pending starts empty", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      expect(event.pending).toEqual([]);
+    });
+
+    test("waitUntil pushes promise to pending when dispatching", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      event.beginDispatch();
+      const promise = Promise.resolve();
+      event.waitUntil(promise);
+      expect(event.pending).toHaveLength(1);
+      event.endDispatch();
+    });
+
+    test("waitUntil wraps non-promise values in Promise.resolve", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      event.beginDispatch();
+      event.waitUntil("not a promise" as unknown as Promise<unknown>);
+      expect(event.pending).toHaveLength(1);
+      expect(event.pending[0]).toBeInstanceOf(Promise);
+      event.endDispatch();
+    });
+
+    test("waitUntil throws outside dispatch", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      expect(() => event.waitUntil(Promise.resolve())).toThrow(
+        "waitUntil() must be called during event dispatch",
+      );
+    });
+
+    test("waitUntil throws after dispatch ends", () => {
+      const event = new AdUnitLifecycleEvent("ad-unit:fetch", { detail: {} });
+      event.beginDispatch();
+      event.endDispatch();
+      expect(() => event.waitUntil(Promise.resolve())).toThrow();
     });
   });
 });
