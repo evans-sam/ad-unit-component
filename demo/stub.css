@@ -1,53 +1,53 @@
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: system-ui, -apple-system, sans-serif;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 4rem 2rem;
-    background: #f8fafc;
-    color: #0f172a;
-    line-height: 1.6;
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+  background: #f8fafc;
+  color: #0f172a;
+  line-height: 1.6;
 }
 
 .stub__eyebrow {
-    color: #64748b;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 0.25rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.25rem;
 }
 
 h1 {
-    margin: 0 0 1.5rem;
-    font-size: 1.75rem;
+  margin: 0 0 1.5rem;
+  font-size: 1.75rem;
 }
 
 code {
-    background: #e2e8f0;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    font-size: 0.9em;
+  background: #e2e8f0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.9em;
 }
 
 a {
-    color: #2563eb;
+  color: #2563eb;
 }
 
 a:hover {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 .stub__back {
-    display: inline-block;
-    margin-top: 2rem;
-    color: #64748b;
-    text-decoration: none;
-    font-size: 0.875rem;
+  display: inline-block;
+  margin-top: 2rem;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 0.875rem;
 }
 
 .stub__back:hover {
-    color: #0f172a;
+  color: #0f172a;
 }
