@@ -1,4 +1,8 @@
-export { AdUnit } from "./ad-unit";
+export {
+  AdUnit,
+  type AdUnitLifecycleDetail,
+  AdUnitLifecycleEvent,
+} from "./ad-unit";
 export {
   type BannerFormat,
   type BannerMediaType,

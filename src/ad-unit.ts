@@ -26,12 +26,67 @@ function parseMargin(
   return { value: Number.parseFloat(match[1]), unit: match[2] as "px" | "%" };
 }
 
+export interface AdUnitLifecycleDetail {
+  code?: string;
+  sizes?: number[][];
+  gpid?: string | null;
+  pos?: number | null;
+  format?: BannerFormat[] | null;
+  container?: HTMLDivElement;
+}
+
+export class AdUnitLifecycleEvent extends CustomEvent<AdUnitLifecycleDetail> {
+  #pending: Promise<unknown>[] = [];
+  #dispatching = false;
+
+  get pending(): readonly Promise<unknown>[] {
+    return this.#pending;
+  }
+
+  waitUntil(promise: Promise<unknown>): void {
+    if (!this.#dispatching) {
+      throw new Error("waitUntil() must be called during event dispatch");
+    }
+    this.#pending.push(Promise.resolve(promise));
+  }
+
+  /** @internal — called by AdUnit before/after dispatchEvent */
+  beginDispatch(): void {
+    this.#dispatching = true;
+  }
+
+  /** @internal */
+  endDispatch(): void {
+    this.#dispatching = false;
+  }
+}
+
 /**
  * AdUnit web component - declarative ad unit lifecycle manager
  *
  * This component is vendor-agnostic. It manages shadow DOM, attribute
  * reflection, and content projection. Vendor-specific behavior (Prebid,
  * GAM, etc.) is handled by adapters that listen to ad-unit events.
+ *
+ * ## Lifecycle
+ *
+ * Stages dispatch in order: `ad-unit:connected` → `ad-unit:fetch` → `ad-unit:render`.
+ * Each stage dispatches as an {@link AdUnitLifecycleEvent}. Listeners can call
+ * `event.waitUntil(promise)` to hold progression to the next stage until the
+ * promise settles. When multiple listeners add waitUntil promises, all are
+ * awaited via `Promise.all` before advancing.
+ *
+ * When no listener calls `waitUntil`, stages dispatch synchronously in the
+ * same call stack — no microtask overhead is introduced.
+ *
+ * Additional observable state:
+ * - {@link blocked} property — `true` while any stage is awaiting waitUntil promises
+ * - `ad-unit:stage-blocked` / `ad-unit:stage-unblocked` events — signal transitions
+ * - `ad-unit:error` event — fires when a waitUntil promise rejects; halts lifecycle
+ *
+ * When `loading="lazy"`, built-in listeners attach `waitUntil(viewport-zone-promise)`
+ * to gate `ad-unit:fetch` on the fetch zone and `ad-unit:render` on the render zone.
+ * These compose with user-supplied waitUntil promises.
  *
  * @example
  * ```html
@@ -63,10 +118,10 @@ export class AdUnit extends HTMLElement {
   ];
 
   #container: HTMLDivElement;
-  #fetchObserver: IntersectionObserver | null = null;
-  #renderObserver: IntersectionObserver | null = null;
-  #fetchFired = false;
-  #renderFired = false;
+  #aborted = false;
+  #cycleId = 0;
+  #blockedStages = new Set<string>();
+  #zoneController: AbortController | null = null;
 
   constructor() {
     super();
@@ -230,122 +285,222 @@ export class AdUnit extends HTMLElement {
     this.setAttribute("render-margin", value);
   }
 
+  /**
+   * True while any lifecycle stage is awaiting a waitUntil promise.
+   */
+  get blocked(): boolean {
+    return this.#blockedStages.size > 0;
+  }
+
   // --- Lifecycle ---
 
   connectedCallback() {
     this.render();
-    this.#dispatchLifecycle("ad-unit:connected");
+    this.#aborted = false;
+    this.#cycleId++;
+    this.#blockedStages.clear();
+    this.#zoneController = new AbortController();
+    this.#runConnectedStage();
+  }
 
+  #runConnectedStage(): void {
+    const connectedEvent = this.#dispatchLifecycle("ad-unit:connected");
     if (this.loading === "lazy") {
-      this.#setupObservers();
-    } else {
-      this.#dispatchLifecycle("ad-unit:fetch");
-      this.#dispatchLifecycle("ad-unit:render");
+      connectedEvent.waitUntil(this.#awaitZone("fetch"));
     }
+    connectedEvent.endDispatch();
+    if (connectedEvent.pending.length === 0) {
+      this.#runFetchStage();
+      return;
+    }
+    this.#awaitStage(connectedEvent, () => this.#runFetchStage());
+  }
+
+  #runFetchStage(): void {
+    if (this.#aborted) return;
+    const fetchEvent = this.#dispatchLifecycle("ad-unit:fetch");
+    if (this.loading === "lazy") {
+      fetchEvent.waitUntil(this.#awaitZone("render"));
+    }
+    fetchEvent.endDispatch();
+    if (fetchEvent.pending.length === 0) {
+      this.#runRenderStage();
+      return;
+    }
+    this.#awaitStage(fetchEvent, () => this.#runRenderStage());
+  }
+
+  #runRenderStage(): void {
+    if (this.#aborted) return;
+    const renderEvent = this.#dispatchLifecycle("ad-unit:render");
+    renderEvent.endDispatch();
+    if (renderEvent.pending.length === 0) return;
+    this.#awaitStage(renderEvent, () => {
+      /* terminal stage — no downstream; #awaitStage still tracks blocked state */
+    });
+  }
+
+  #stageName(eventType: string): string {
+    return eventType.replace(/^ad-unit:/, "");
+  }
+
+  #awaitStage(event: AdUnitLifecycleEvent, onResolved: () => void): void {
+    const stage = this.#stageName(event.type);
+    const cycleId = this.#cycleId;
+    this.#blockedStages.add(event.type);
+    this.dispatchEvent(
+      new CustomEvent("ad-unit:stage-blocked", {
+        bubbles: true,
+        composed: true,
+        cancelable: false,
+        detail: { stage },
+      }),
+    );
+
+    const isStale = () => this.#aborted || this.#cycleId !== cycleId;
+
+    const finalize = () => {
+      this.#blockedStages.delete(event.type);
+      if (isStale()) return;
+      this.dispatchEvent(
+        new CustomEvent("ad-unit:stage-unblocked", {
+          bubbles: true,
+          composed: true,
+          cancelable: false,
+          detail: { stage },
+        }),
+      );
+    };
+
+    Promise.all(event.pending).then(
+      () => {
+        finalize();
+        if (isStale()) return;
+        onResolved();
+      },
+      (error: unknown) => {
+        finalize();
+        if (isStale()) return;
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
+        this.dispatchEvent(
+          new CustomEvent("ad-unit:error", {
+            bubbles: true,
+            composed: true,
+            cancelable: false,
+            detail: { stage: this.#stageName(event.type), error },
+          }),
+        );
+      },
+    );
   }
 
   disconnectedCallback() {
-    this.#teardownObservers();
-    this.#dispatchLifecycle("ad-unit:disconnected");
+    this.#aborted = true;
+    this.#zoneController?.abort();
+    this.#zoneController = null;
+    const disconnectedEvent = this.#dispatchLifecycle("ad-unit:disconnected");
+    disconnectedEvent.endDispatch();
   }
 
-  #setupObservers() {
-    this.#fetchFired = false;
-    this.#renderFired = false;
-
-    let fetchMargin = this.fetchMargin;
+  #resolveMargin(zone: "fetch" | "render"): string {
+    const fetchMargin = this.fetchMargin;
     const renderMargin = this.renderMargin;
-
     const fetchParsed = parseMargin(fetchMargin, "fetch-margin", this.code);
     const renderParsed = parseMargin(renderMargin, "render-margin", this.code);
+
+    let effectiveFetch = fetchMargin;
     if (
       fetchParsed.unit === renderParsed.unit &&
       fetchParsed.value < renderParsed.value
     ) {
-      console.warn(
-        `[ad-unit "${this.code}"] fetch-margin (${fetchMargin}) is less than render-margin (${renderMargin}), clamping fetch-margin to render-margin`,
-      );
-      fetchMargin = renderMargin;
+      // Only warn once — when resolving the fetch zone.
+      if (zone === "fetch") {
+        console.warn(
+          `[ad-unit "${this.code}"] fetch-margin (${fetchMargin}) is less than render-margin (${renderMargin}), clamping fetch-margin to render-margin`,
+        );
+      }
+      effectiveFetch = renderMargin;
     }
 
-    this.#fetchObserver = this.#createObserver(
-      fetchMargin,
-      "fetch-margin",
-      () => {
-        if (this.#fetchFired) return;
-        this.#fetchFired = true;
-        this.#fetchObserver?.unobserve(this);
-        this.#dispatchLifecycle("ad-unit:fetch");
-      },
-    );
-
-    this.#renderObserver = this.#createObserver(
-      renderMargin,
-      "render-margin",
-      () => {
-        if (this.#renderFired) return;
-        if (!this.#fetchFired) {
-          this.#fetchFired = true;
-          this.#fetchObserver?.unobserve(this);
-          this.#dispatchLifecycle("ad-unit:fetch");
-        }
-        this.#renderFired = true;
-        this.#renderObserver?.unobserve(this);
-        this.#dispatchLifecycle("ad-unit:render");
-      },
-    );
-
-    this.#fetchObserver.observe(this);
-    this.#renderObserver.observe(this);
+    return zone === "fetch" ? effectiveFetch : renderMargin;
   }
 
-  #createObserver(
-    margin: string,
-    attrName: string,
-    onIntersect: () => void,
-  ): IntersectionObserver {
-    try {
-      return new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting) {
-              onIntersect();
-              return;
+  #awaitZone(zone: "fetch" | "render"): Promise<void> {
+    const signal = this.#zoneController?.signal;
+    if (!signal) {
+      return Promise.reject(
+        new DOMException("ad-unit disconnected", "AbortError"),
+      );
+    }
+
+    const rawMargin = zone === "fetch" ? this.fetchMargin : this.renderMargin;
+    const attributeName = zone === "fetch" ? "fetch-margin" : "render-margin";
+    const effectiveMargin = this.#resolveMargin(zone);
+
+    return new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException("ad-unit disconnected", "AbortError"));
+        return;
+      }
+
+      let observer: IntersectionObserver;
+      try {
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                observer.disconnect();
+                resolve();
+                return;
+              }
             }
-          }
+          },
+          { rootMargin: effectiveMargin },
+        );
+      } catch (error) {
+        reject(
+          new Error(
+            `[ad-unit "${this.code}"] Invalid ${attributeName} "${rawMargin}": ${
+              error instanceof Error ? error.message : error
+            }`,
+          ),
+        );
+        return;
+      }
+
+      observer.observe(this);
+
+      signal.addEventListener(
+        "abort",
+        () => {
+          observer.disconnect();
+          reject(new DOMException("ad-unit disconnected", "AbortError"));
         },
-        { rootMargin: margin },
+        { once: true },
       );
-    } catch (e) {
-      throw new Error(
-        `[ad-unit "${this.code}"] Invalid ${attrName} "${margin}": ${e instanceof Error ? e.message : e}`,
-      );
-    }
+    });
   }
 
-  #teardownObservers() {
-    this.#fetchObserver?.disconnect();
-    this.#renderObserver?.disconnect();
-    this.#fetchObserver = null;
-    this.#renderObserver = null;
-  }
-
-  #dispatchLifecycle(type: string) {
-    this.dispatchEvent(
-      new CustomEvent(type, {
-        bubbles: true,
-        composed: true,
-        cancelable: true,
-        detail: {
-          code: this.code,
-          sizes: this.sizes,
-          gpid: this.gpid,
-          pos: this.pos,
-          format: this.format,
-          container: this.container,
-        },
-      }),
-    );
+  #dispatchLifecycle(type: string): AdUnitLifecycleEvent {
+    const event = new AdUnitLifecycleEvent(type, {
+      bubbles: true,
+      composed: true,
+      cancelable: false,
+      detail: {
+        code: this.code,
+        sizes: this.sizes,
+        gpid: this.gpid,
+        pos: this.pos,
+        format: this.format,
+        container: this.container,
+      },
+    });
+    event.beginDispatch();
+    this.dispatchEvent(event);
+    // Note: do NOT endDispatch yet. The caller may add built-in waiters
+    // (e.g. lazy-loading zone promises) before inspecting .pending.
+    return event;
   }
 
   attributeChangedCallback(

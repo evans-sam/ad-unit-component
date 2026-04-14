@@ -55,7 +55,7 @@ export function createMockAdapter(
   //   ad-unit:fetch   → #4 IntersectionObserver fetch zone
   //   ad-unit:render  → #4 IntersectionObserver render zone
   //   ad-unit:refresh → #6 refresh() method
-  // When those land, attach handlers here and respect event.defaultPrevented for #5.
+  // When those land, attach handlers here and call event.waitUntil(bidPromise) to gate render.
 
   return {
     start() {
