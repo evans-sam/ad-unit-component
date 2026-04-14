@@ -31,9 +31,24 @@ export class AdUnit extends HTMLElement {
     "name",
   ];
 
+  #container: HTMLDivElement;
+
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
+    const root = this.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = ":host { display: block; }";
+    this.#container = document.createElement("div");
+    this.#container.setAttribute("part", "container");
+    this.#container.appendChild(document.createElement("slot"));
+    root.append(style, this.#container);
+  }
+
+  /**
+   * Managed container div inside the shadow DOM. Adapters render ads here.
+   */
+  get container(): HTMLDivElement {
+    return this.#container;
   }
 
   // --- Attribute/Property reflection ---
@@ -160,11 +175,29 @@ export class AdUnit extends HTMLElement {
 
   connectedCallback() {
     this.render();
+    this.#dispatchLifecycle("ad-unit:connected");
   }
 
   disconnectedCallback() {
-    // Extension point: adapters may override or observe this lifecycle hook
-    // to clean up subscriptions when the element is removed from the DOM.
+    this.#dispatchLifecycle("ad-unit:disconnected");
+  }
+
+  #dispatchLifecycle(type: string) {
+    this.dispatchEvent(
+      new CustomEvent(type, {
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+        detail: {
+          code: this.code,
+          sizes: this.sizes,
+          gpid: this.gpid,
+          pos: this.pos,
+          format: this.format,
+          container: this.container,
+        },
+      }),
+    );
   }
 
   attributeChangedCallback(
@@ -182,16 +215,8 @@ export class AdUnit extends HTMLElement {
   // --- Rendering ---
 
   render() {
-    if (!this.shadowRoot) return;
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-        }
-      </style>
-      <slot></slot>
-    `;
+    // Shadow DOM structure is stable (built in constructor). Extension point
+    // for subclasses / future behavior that reacts to attribute changes.
   }
 }
 
