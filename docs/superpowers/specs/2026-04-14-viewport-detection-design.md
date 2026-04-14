@@ -65,7 +65,9 @@ Both events use the same flags and detail shape as existing lifecycle events:
 
 ### Event order (lazy mode)
 
-`ad-unit:connected` fires synchronously. `ad-unit:fetch` and `ad-unit:render` fire independently when their respective observers trigger. Fetch will typically fire before render because its margin is larger, but this is not guaranteed by the implementation.
+`ad-unit:connected` fires synchronously. `ad-unit:fetch` and `ad-unit:render` fire asynchronously when their respective observers trigger.
+
+**Critical invariant: fetch always fires before render.** If the element is already in view when connected (both observers trigger immediately), the render observer callback must check `#fetchFired` before dispatching. If fetch hasn't fired yet, the render callback dispatches `ad-unit:fetch` first, then `ad-unit:render`. This guarantees adapters always see fetch before render regardless of observer callback ordering.
 
 ## Observer Lifecycle
 
@@ -88,7 +90,7 @@ Both events use the same flags and detail shape as existing lifecycle events:
 1. Reset guards: `#fetchFired = false`, `#renderFired = false`
 2. Validate margins: if fetch margin < render margin (same unit), `console.warn` with context and clamp fetch = render. Mixed units skip the check.
 3. Create fetch observer with `rootMargin: this.fetchMargin`. On intersection: if `!#fetchFired`, dispatch `ad-unit:fetch`, set `#fetchFired = true`, unobserve `this`.
-4. Create render observer with `rootMargin: this.renderMargin`. Same pattern for `ad-unit:render`.
+4. Create render observer with `rootMargin: this.renderMargin`. On intersection: if `!#renderFired`, check `#fetchFired` — if fetch hasn't fired yet, dispatch `ad-unit:fetch` first (and set `#fetchFired = true`, unobserve from fetch observer). Then dispatch `ad-unit:render`, set `#renderFired = true`, unobserve `this`.
 5. Both call `observe(this)`.
 6. Observer construction is wrapped in try/catch. On error, wrap the message with `[ad-unit "${this.code}"] Invalid fetch-margin "${value}": ${originalMessage}` (or `render-margin`) and re-throw.
 
@@ -170,6 +172,7 @@ Replaced in `beforeEach`, restored in `afterEach`.
 9. Each event fires at most once per connected lifecycle
 10. Observers disconnected on element removal
 11. Reconnect resets lifecycle (events can fire again)
+12. Element already in view on connect (lazy): fetch fires before render, both fire
 
 **Validation:**
 12. Invalid margin throws with helpful `[ad-unit "code"]` context
