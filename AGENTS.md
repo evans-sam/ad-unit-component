@@ -98,7 +98,7 @@ interface AdUnitLifecycleDetail {
 
 `loading="lazy"` attaches built-in `waitUntil` promises that gate `ad-unit:fetch` on a fetch-zone `IntersectionObserver` and `ad-unit:render` on a render-zone observer. Zones compose with user `waitUntil` calls. Margin validation: if `fetch-margin < render-margin` in same unit, fetch margin clamps to render margin with a console.warn. Invalid margin values surface via `ad-unit:error`.
 
-### Refresh (issue #6, in progress)
+### Refresh
 
 `refresh()` method triggers a new lifecycle cycle: `ad-unit:refresh` → `ad-unit:fetch` → `ad-unit:render`. Reuses the same `waitUntil` stage machinery. Refresh bypasses lazy viewport gates — explicit trigger. `adUnit.refreshCount` (readonly) increments per call, carried on all stage event details.
 
@@ -190,9 +190,9 @@ Closed (merged) work that shapes current architecture:
 - **#3** — rewrite as pure lifecycle component with DOM events
 - **#4** — `IntersectionObserver` lazy loading with `fetch-margin` / `render-margin`
 - **#5** — replace cancelable-event + `proceed()` with `event.waitUntil(promise)`
+- **#6** — `refresh()` method + `ad-unit:refresh` event with `refreshCount` property
 
 Open work that matters for current edits:
 
-- **#6** — `refresh()` method + `ad-unit:refresh` event (this branch)
 - **#7** — adapter registries + TypeScript interfaces
 - **#10/#11/#12** — GAM, Prebid, apstag adapters (external to the component)

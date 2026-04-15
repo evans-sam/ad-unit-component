@@ -331,6 +331,8 @@ The adapter interfaces with `<ad-unit>` using only public DOM surface:
 | Tear down timers on element removal     | `ad-unit:disconnected` event                   |
 | Distinguish first-load from refresh     | `event.detail.refreshCount`                    |
 
+Note: `detail.refreshCount` is carried only on lifecycle events dispatched as `AdUnitLifecycleEvent` — `ad-unit:connected`, `ad-unit:disconnected`, `ad-unit:refresh`, `ad-unit:fetch`, `ad-unit:render`. The state-change events (`ad-unit:stage-blocked`, `ad-unit:stage-unblocked`, `ad-unit:error`) are plain `CustomEvent`s with narrower detail shapes (`{ stage }` or `{ stage, error }`). Adapters correlating errors or stage transitions with a specific refresh invocation should snapshot `unit.refreshCount` from the getter at the moment the event fires.
+
 The component makes zero assumptions about adapter policy. The adapter makes zero assumptions about component-internal state beyond the public surface above.
 
 ## Testing strategy
