@@ -3,23 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Refresh scenario — stub</title>
-    <link href="../stub.css" rel="stylesheet">
+    <title>refresh() scenario · ad-unit demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+            background: #f8fafc;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        .eyebrow {
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 0 0 0.5rem;
+        }
+
+        .lede {
+            color: #475569;
+            margin: 0;
+            max-width: 720px;
+        }
+
+        .back {
+            display: inline-block;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .back:hover {
+            color: #0f172a;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        section {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        section h2 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        section p {
+            margin: 0 0 0.75rem;
+            color: #475569;
+        }
+
+        .unit-row {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 1.25rem 1.5rem;
+            align-items: center;
+        }
+
+        .unit-label {
+            font-size: 0.6875rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            grid-column: 1 / -1;
+        }
+
+        .count-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .count-chip strong {
+            font-size: 0.875rem;
+            color: #0f172a;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 0.75rem;
+        }
+
+        button {
+            font: inherit;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #0f172a;
+            background: #0f172a;
+            color: white;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: white;
+            color: #0f172a;
+        }
+
+        button.toggle[aria-pressed="true"] {
+            background: #047857;
+            border-color: #047857;
+            color: white;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            border-color: #cbd5e1;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        aside {
+            position: sticky;
+            top: 2rem;
+        }
+
+        aside event-log {
+            display: block;
+        }
+
+        .interval-label {
+            color: #475569;
+            font-size: 0.8125rem;
+        }
+
+        .interval-label code {
+            color: #0f172a;
+        }
+    </style>
 </head>
 <body>
-<main class="stub">
-    <p class="stub__eyebrow">Scenario · stub</p>
-    <h1>refresh()</h1>
-    <p>
-        This scenario will demonstrate calling <code>unit.refresh()</code> on an
-        <code>&lt;ad-unit&gt;</code> element and the mock adapter repainting the
-        container with a new bid price.
+<a class="back" href="/">← back to demo index</a>
+
+<header>
+    <p class="eyebrow">Scenario</p>
+    <h1>refresh() — re-auction a live unit</h1>
+    <p class="lede">
+        <code>unit.refresh()</code> kicks off a new lifecycle cycle:
+        <code>ad-unit:refresh</code> → <code>ad-unit:fetch</code> →
+        <code>ad-unit:render</code>. The same <code>waitUntil</code> machinery
+        used on initial connect applies. The mock adapter re-runs its fake
+        auction and repaints the placard with a fresh bid price. The
+        <code>refreshCount</code> property increments before each
+        <code>ad-unit:refresh</code> dispatches and rides on every lifecycle
+        event's <code>detail.refreshCount</code>.
     </p>
-    <p>
-        Lands with issue <a href="https://github.com/evans-sam/ad-unit-component/issues/6">#6 — Add refresh() method and
-        ad-unit:refresh event</a>.
-    </p>
-    <p><a class="stub__back" href="/">← back to demo index</a></p>
-</main>
+</header>
+
+<div class="layout">
+    <div>
+        <section>
+            <h2>Manual refresh</h2>
+            <p>
+                Hit <strong>Refresh now</strong> to re-run the auction for the
+                unit below. Watch the placard flip back to "auctioning…" and
+                then to a new CPM. The
+                <code>refreshCount</code> counter below updates live.
+            </p>
+            <div class="unit-row">
+                <span class="unit-label">Leaderboard · 728×90</span>
+                <ad-unit code="refresh-unit" sizes="728x90" gpid="/1234/demo/refresh" pos="1">
+                    Refresh me
+                </ad-unit>
+                <span class="count-chip">refreshCount: <strong id="count">0</strong></span>
+            </div>
+            <div class="controls">
+                <button id="refresh-btn" type="button">Refresh now</button>
+                <button class="secondary" id="burst-btn" type="button">Burst refresh ×5 (abort-and-restart)</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>Auto refresh</h2>
+            <p>
+                Toggle a 5-second interval timer — the kind of policy a
+                real refresh adapter would own. When enabled, the timer
+                calls <code>unit.refresh()</code> every 5 seconds. Policies
+                like viewability gating and max-count caps live in the
+                adapter, not the component.
+            </p>
+            <div class="controls">
+                <button id="auto-btn" class="toggle" type="button" aria-pressed="false">
+                    Start 5s auto-refresh
+                </button>
+                <span class="interval-label" id="auto-status">off</span>
+            </div>
+        </section>
+
+        <section>
+            <h2>What to watch in the log</h2>
+            <p>
+                Each refresh emits three events in order:
+                <code>ad-unit:refresh</code> (new cycle starts; detail carries
+                incremented <code>refreshCount</code>), then
+                <code>ad-unit:fetch</code> (adapter starts auction), then
+                <code>ad-unit:render</code> (adapter paints new bid). Burst
+                refresh aborts any in-flight cycle via a cycle-id stale check —
+                no duplicate render events.
+            </p>
+        </section>
+    </div>
+
+    <aside>
+        <event-log></event-log>
+    </aside>
+</div>
+
+<script src="./refresh.ts" type="module"></script>
 </body>
 </html>

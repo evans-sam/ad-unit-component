@@ -1077,7 +1077,7 @@ describe("AdUnit", () => {
       await Promise.resolve();
       expect(renderFired).toBe(false);
 
-      resolveAuction!();
+      resolveAuction?.();
       await auction;
       await Promise.resolve();
       await Promise.resolve();
@@ -1177,9 +1177,9 @@ describe("AdUnit", () => {
         await Promise.resolve();
 
         expect(errorDetail).not.toBeNull();
-        expect(errorDetail!.stage).toBe("connected");
-        expect(errorDetail!.error).toBeInstanceOf(Error);
-        expect((errorDetail!.error as Error).message).toContain(
+        expect(errorDetail?.stage).toBe("connected");
+        expect(errorDetail?.error).toBeInstanceOf(Error);
+        expect((errorDetail?.error as Error).message).toContain(
           `[ad-unit "test-ad"] Invalid fetch-margin "banana":`,
         );
       } finally {
@@ -1222,7 +1222,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(fetchFired).toBe(false); // async path
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve(); // let chained then run
 
@@ -1247,7 +1247,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(renderFired).toBe(false);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1278,12 +1278,12 @@ describe("AdUnit", () => {
 
       container.appendChild(element);
 
-      resolveA!();
+      resolveA?.();
       await gateA;
       await Promise.resolve();
       expect(renderFired).toBe(false); // B still pending
 
-      resolveB!();
+      resolveB?.();
       await gateB;
       await Promise.resolve();
       expect(renderFired).toBe(true);
@@ -1307,7 +1307,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       container.removeChild(element); // disconnect before gate resolves
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1338,8 +1338,8 @@ describe("AdUnit", () => {
 
       expect(renderFired).toBe(false);
       expect(errorDetail).not.toBeNull();
-      expect(errorDetail!.stage).toBe("fetch");
-      expect(errorDetail!.error).toBe(error);
+      expect(errorDetail?.stage).toBe("fetch");
+      expect(errorDetail?.error).toBe(error);
     });
 
     test("AbortError on zone promise does not dispatch ad-unit:error", async () => {
@@ -1411,7 +1411,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(element.blocked).toBe(true);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1457,7 +1457,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(events).toEqual([{ type: "blocked", stage: "fetch" }]);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1488,7 +1488,7 @@ describe("AdUnit", () => {
       expect(element.blocked).toBe(false);
 
       // Allow the stale gate to resolve — must not revive blocked state.
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1516,7 +1516,7 @@ describe("AdUnit", () => {
       element.removeEventListener("ad-unit:fetch", fetchHandler);
       container.appendChild(element);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1554,7 +1554,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(element.blocked).toBe(true);
 
-      resolveStale!();
+      resolveStale?.();
       await staleGate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1562,7 +1562,7 @@ describe("AdUnit", () => {
       // New cycle still pending — blocked must remain true.
       expect(element.blocked).toBe(true);
 
-      resolveFresh!();
+      resolveFresh?.();
       await freshGate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1729,7 +1729,7 @@ describe("AdUnit", () => {
       expect(fetchFired).toBe(false);
       expect(element.blocked).toBe(true);
 
-      resolveGate!();
+      resolveGate?.();
       await gate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1797,7 +1797,7 @@ describe("AdUnit", () => {
       element.refresh();
       expect(events).toEqual([{ type: "blocked", stage: "refresh" }]);
 
-      resolveGate!();
+      resolveGate?.();
       await gate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1876,7 +1876,7 @@ describe("AdUnit", () => {
       expect(element.blocked).toBe(false);
 
       // Old promise resolves — must not retrigger anything
-      resolveStale!();
+      resolveStale?.();
       await staleGate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1917,7 +1917,7 @@ describe("AdUnit", () => {
       expect(element.blocked).toBe(false);
 
       // First gate resolves post-hoc — stale, must not advance
-      resolveFirst!();
+      resolveFirst?.();
       await firstGate;
       await Promise.resolve();
       await Promise.resolve();
@@ -1952,14 +1952,14 @@ describe("AdUnit", () => {
       element.refresh();
       expect(element.blocked).toBe(true); // still blocked — new cycle's gate pending
 
-      resolveFirst!();
+      resolveFirst?.();
       await firstGate;
       await Promise.resolve();
       await Promise.resolve();
 
       expect(element.blocked).toBe(true); // still blocked — second gate not resolved yet
 
-      resolveSecond!();
+      resolveSecond?.();
       await secondGate;
       await Promise.resolve();
       await Promise.resolve();
