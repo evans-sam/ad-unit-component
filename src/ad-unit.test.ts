@@ -650,6 +650,65 @@ describe("AdUnit", () => {
       container.removeChild(element);
       expect(detail?.refreshCount).toBe(0);
     });
+
+    test("increments to 1 after first refresh, 2 after second", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      expect(element.refreshCount).toBe(0);
+      element.refresh();
+      expect(element.refreshCount).toBe(1);
+      element.refresh();
+      expect(element.refreshCount).toBe(2);
+    });
+
+    test("refresh, fetch, and render events in a refresh cycle all carry the new count", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const seen: number[] = [];
+      const capture = (e: Event) => {
+        seen.push((e as CustomEvent).detail.refreshCount);
+      };
+      element.addEventListener("ad-unit:refresh", capture);
+      element.addEventListener("ad-unit:fetch", capture);
+      element.addEventListener("ad-unit:render", capture);
+
+      element.refresh();
+
+      expect(seen).toEqual([1, 1, 1]);
+    });
+
+    test("persists across disconnect and reconnect of the same instance", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      element.refresh();
+      element.refresh();
+      expect(element.refreshCount).toBe(2);
+
+      container.removeChild(element);
+      container.appendChild(element);
+
+      expect(element.refreshCount).toBe(2);
+    });
+
+    test("is 2 on connected event detail after reconnect that followed two refreshes", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      element.refresh();
+      element.refresh();
+
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:connected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+
+      container.removeChild(element);
+      container.appendChild(element);
+
+      expect(detail?.refreshCount).toBe(2);
+    });
   });
 
   describe("eager mode (default)", () => {
