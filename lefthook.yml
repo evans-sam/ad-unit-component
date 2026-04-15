@@ -6,4 +6,4 @@ pre-commit:
       stage_fixed: true
     compat:
       glob: "*.{js,ts,jsx,tsx}"
-      run: bunx oxlint --no-error-on-unmatched-pattern {staged_files}
+      run: bunx oxlint -A all -D compat/compat --no-error-on-unmatched-pattern {staged_files}

@@ -19,7 +19,7 @@
     "test:coverage": "bun test --coverage",
     "lint": "biome check",
     "lint:fix": "biome check --write --unsafe",
-    "lint:compat": "oxlint",
+    "lint:compat": "oxlint -A all -D compat/compat",
     "format": "biome format --write"
   },
   "exports": {
