@@ -1847,5 +1847,124 @@ describe("AdUnit", () => {
         warnSpy.mockRestore();
       }
     });
+
+    test("refresh while initial ad-unit:fetch is blocked aborts old cycle and starts a new one", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let resolveStale: () => void;
+      const staleGate = new Promise<void>((r) => {
+        resolveStale = r;
+      });
+      const staleFetchHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(staleGate);
+      };
+      element.addEventListener("ad-unit:fetch", staleFetchHandler);
+
+      let renderCount = 0;
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      element.removeEventListener("ad-unit:fetch", staleFetchHandler);
+      element.refresh();
+
+      // New cycle completes synchronously (no listeners blocking fetch)
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+
+      // Old promise resolves — must not retrigger anything
+      resolveStale!();
+      await staleGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+    });
+
+    test("two refreshes in rapid succession: only the newest cycle's fetch/render complete", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveFirst: () => void;
+      const firstGate = new Promise<void>((r) => {
+        resolveFirst = r;
+      });
+
+      let refreshCalls = 0;
+      const refreshHandler = (e: Event) => {
+        refreshCalls++;
+        if (refreshCalls === 1) {
+          (e as AdUnitLifecycleEvent).waitUntil(firstGate);
+        }
+      };
+      element.addEventListener("ad-unit:refresh", refreshHandler);
+
+      let renderCount = 0;
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      element.refresh(); // first refresh: blocks on firstGate
+      expect(element.blocked).toBe(true);
+      expect(renderCount).toBe(0);
+
+      element.refresh(); // second refresh: aborts first, runs synchronously
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+
+      // First gate resolves post-hoc — stale, must not advance
+      resolveFirst!();
+      await firstGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderCount).toBe(1);
+    });
+
+    test("adUnit.blocked tracks only the newest cycle", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveFirst: () => void;
+      const firstGate = new Promise<void>((r) => {
+        resolveFirst = r;
+      });
+      let resolveSecond: () => void;
+      const secondGate = new Promise<void>((r) => {
+        resolveSecond = r;
+      });
+
+      let call = 0;
+      const handler = (e: Event) => {
+        call++;
+        const gate = call === 1 ? firstGate : secondGate;
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      };
+      element.addEventListener("ad-unit:refresh", handler);
+
+      element.refresh();
+      expect(element.blocked).toBe(true);
+
+      element.refresh();
+      expect(element.blocked).toBe(true); // still blocked — new cycle's gate pending
+
+      resolveFirst!();
+      await firstGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(true); // still blocked — second gate not resolved yet
+
+      resolveSecond!();
+      await secondGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
   });
 });
