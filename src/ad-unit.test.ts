@@ -1807,5 +1807,45 @@ describe("AdUnit", () => {
         { type: "unblocked", stage: "refresh" },
       ]);
     });
+
+    test("refresh on never-connected element warns and no-ops", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+
+      const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        element.refresh();
+        expect(fired).toBe(false);
+        expect(element.refreshCount).toBe(0);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test("refresh on element after disconnect warns and no-ops", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      container.removeChild(element);
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+
+      const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        element.refresh();
+        expect(fired).toBe(false);
+        expect(element.refreshCount).toBe(0);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 });
