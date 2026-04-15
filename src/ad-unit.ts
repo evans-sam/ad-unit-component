@@ -331,6 +331,20 @@ export class AdUnit extends HTMLElement {
     );
   }
 
+  #runRefreshStage(): void {
+    const cycleId = this.#cycleId;
+    const refreshEvent = this.#dispatchLifecycle("ad-unit:refresh");
+    refreshEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
+    if (refreshEvent.pending.length === 0) {
+      this.#runFetchStage("refresh", cycleId);
+      return;
+    }
+    this.#awaitStage(refreshEvent, cycleId, () =>
+      this.#runFetchStage("refresh", cycleId),
+    );
+  }
+
   #runFetchStage(source: "initial" | "refresh", cycleId: number): void {
     if (this.#aborted || this.#cycleId !== cycleId) return;
     const fetchEvent = this.#dispatchLifecycle("ad-unit:fetch");
@@ -415,6 +429,33 @@ export class AdUnit extends HTMLElement {
         );
       },
     );
+  }
+
+  /**
+   * Kicks off a new lifecycle cycle: dispatches ad-unit:refresh, then
+   * chains into ad-unit:fetch → ad-unit:render using the same waitUntil
+   * machinery as the initial connect. No-op (with console.warn) if the
+   * element is not connected. Aborts any in-flight cycle (pending
+   * waitUntil promises from the prior cycle settle into no-ops via the
+   * cycle-id stale check).
+   *
+   * Refresh bypasses lazy-loading viewport gates — the caller is
+   * explicitly asking for a refresh. Viewability-gated scheduling is
+   * a refresh-adapter concern, not a component concern.
+   */
+  refresh(): void {
+    if (!this.isConnected) {
+      console.warn(
+        `[ad-unit "${this.code}"] refresh() called on disconnected element; ignored`,
+      );
+      return;
+    }
+    this.#zoneController?.abort();
+    this.#cycleId++;
+    this.#blockedStages.clear();
+    this.#zoneController = new AbortController();
+    this.#refreshCount++;
+    this.#runRefreshStage();
   }
 
   disconnectedCallback() {

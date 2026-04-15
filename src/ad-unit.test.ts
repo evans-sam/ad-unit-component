@@ -1557,4 +1557,96 @@ describe("AdUnit", () => {
       expect(() => event.waitUntil(Promise.resolve())).toThrow();
     });
   });
+
+  describe("refresh()", () => {
+    test("dispatches ad-unit:refresh on the element", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+      element.refresh();
+      expect(fired).toBe(true);
+    });
+
+    test("refresh event is an AdUnitLifecycleEvent with correct flags", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let captured: Event | undefined;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        captured = e;
+      });
+      element.refresh();
+
+      expect(captured).toBeInstanceOf(AdUnitLifecycleEvent);
+      expect(captured?.bubbles).toBe(true);
+      expect(captured?.composed).toBe(true);
+      expect(captured?.cancelable).toBe(false);
+    });
+
+    test("refresh event detail carries full configuration plus refreshCount", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("code", "test-ad");
+      element.setAttribute("sizes", "300x250");
+      element.setAttribute("gpid", "/123/home");
+      element.setAttribute("pos", "1");
+      container.appendChild(element);
+
+      let detail:
+        | {
+            code?: string;
+            sizes?: number[][];
+            gpid?: string | null;
+            pos?: number | null;
+            container?: HTMLDivElement;
+            refreshCount?: number;
+          }
+        | undefined;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      element.refresh();
+
+      expect(detail?.code).toBe("test-ad");
+      expect(detail?.sizes).toEqual([[300, 250]]);
+      expect(detail?.gpid).toBe("/123/home");
+      expect(detail?.pos).toBe(1);
+      expect(detail?.container).toBe(element.container);
+      expect(detail?.refreshCount).toBe(1);
+    });
+
+    test("refresh chains refresh → fetch → render in order", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const order: string[] = [];
+      element.addEventListener("ad-unit:refresh", () => order.push("refresh"));
+      element.addEventListener("ad-unit:fetch", () => order.push("fetch"));
+      element.addEventListener("ad-unit:render", () => order.push("render"));
+
+      element.refresh();
+
+      expect(order).toEqual(["refresh", "fetch", "render"]);
+    });
+
+    test("document-level listener receives ad-unit:refresh (bubbles + composed)", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let fired = false;
+      const handler = () => {
+        fired = true;
+      };
+      document.addEventListener("ad-unit:refresh", handler);
+      try {
+        element.refresh();
+      } finally {
+        document.removeEventListener("ad-unit:refresh", handler);
+      }
+      expect(fired).toBe(true);
+    });
+  });
 });
