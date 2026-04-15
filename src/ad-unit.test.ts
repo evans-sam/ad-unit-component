@@ -1421,6 +1421,52 @@ describe("AdUnit", () => {
 
       expect(unblockedStages).toEqual([]);
     });
+
+    test("old cycle's finalize does not clear new cycle's blocked entry after reconnect", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let resolveStale: () => void;
+      const staleGate = new Promise<void>((r) => {
+        resolveStale = r;
+      });
+      const staleHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(staleGate);
+      };
+      element.addEventListener("ad-unit:fetch", staleHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      container.removeChild(element);
+      element.removeEventListener("ad-unit:fetch", staleHandler);
+
+      let resolveFresh: () => void;
+      const freshGate = new Promise<void>((r) => {
+        resolveFresh = r;
+      });
+      const freshHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(freshGate);
+      };
+      element.addEventListener("ad-unit:fetch", freshHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      resolveStale!();
+      await staleGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // New cycle still pending — blocked must remain true.
+      expect(element.blocked).toBe(true);
+
+      resolveFresh!();
+      await freshGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
   });
 
   describe("AdUnitLifecycleEvent", () => {

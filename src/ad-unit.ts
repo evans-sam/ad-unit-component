@@ -304,38 +304,44 @@ export class AdUnit extends HTMLElement {
   }
 
   #runConnectedStage(): void {
+    const cycleId = this.#cycleId;
     const connectedEvent = this.#dispatchLifecycle("ad-unit:connected");
     if (this.loading === "lazy") {
       connectedEvent.waitUntil(this.#awaitZone("fetch"));
     }
     connectedEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (connectedEvent.pending.length === 0) {
-      this.#runFetchStage();
+      this.#runFetchStage(cycleId);
       return;
     }
-    this.#awaitStage(connectedEvent, () => this.#runFetchStage());
+    this.#awaitStage(connectedEvent, cycleId, () =>
+      this.#runFetchStage(cycleId),
+    );
   }
 
-  #runFetchStage(): void {
-    if (this.#aborted) return;
+  #runFetchStage(cycleId: number): void {
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     const fetchEvent = this.#dispatchLifecycle("ad-unit:fetch");
     if (this.loading === "lazy") {
       fetchEvent.waitUntil(this.#awaitZone("render"));
     }
     fetchEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (fetchEvent.pending.length === 0) {
-      this.#runRenderStage();
+      this.#runRenderStage(cycleId);
       return;
     }
-    this.#awaitStage(fetchEvent, () => this.#runRenderStage());
+    this.#awaitStage(fetchEvent, cycleId, () => this.#runRenderStage(cycleId));
   }
 
-  #runRenderStage(): void {
-    if (this.#aborted) return;
+  #runRenderStage(cycleId: number): void {
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     const renderEvent = this.#dispatchLifecycle("ad-unit:render");
     renderEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (renderEvent.pending.length === 0) return;
-    this.#awaitStage(renderEvent, () => {
+    this.#awaitStage(renderEvent, cycleId, () => {
       /* terminal stage — no downstream; #awaitStage still tracks blocked state */
     });
   }
@@ -344,9 +350,12 @@ export class AdUnit extends HTMLElement {
     return eventType.replace(/^ad-unit:/, "");
   }
 
-  #awaitStage(event: AdUnitLifecycleEvent, onResolved: () => void): void {
+  #awaitStage(
+    event: AdUnitLifecycleEvent,
+    cycleId: number,
+    onResolved: () => void,
+  ): void {
     const stage = this.#stageName(event.type);
-    const cycleId = this.#cycleId;
     this.#blockedStages.add(event.type);
     this.dispatchEvent(
       new CustomEvent("ad-unit:stage-blocked", {
@@ -360,8 +369,8 @@ export class AdUnit extends HTMLElement {
     const isStale = () => this.#aborted || this.#cycleId !== cycleId;
 
     const finalize = () => {
-      this.#blockedStages.delete(event.type);
       if (isStale()) return;
+      this.#blockedStages.delete(event.type);
       this.dispatchEvent(
         new CustomEvent("ad-unit:stage-unblocked", {
           bubbles: true,
