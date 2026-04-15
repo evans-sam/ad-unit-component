@@ -312,30 +312,32 @@ export class AdUnit extends HTMLElement {
     connectedEvent.endDispatch();
     if (this.#aborted || this.#cycleId !== cycleId) return;
     if (connectedEvent.pending.length === 0) {
-      this.#runFetchStage(cycleId);
+      this.#runFetchStage("initial", cycleId);
       return;
     }
     this.#awaitStage(connectedEvent, cycleId, () =>
-      this.#runFetchStage(cycleId),
+      this.#runFetchStage("initial", cycleId),
     );
   }
 
-  #runFetchStage(cycleId: number): void {
+  #runFetchStage(source: "initial" | "refresh", cycleId: number): void {
     if (this.#aborted || this.#cycleId !== cycleId) return;
     const fetchEvent = this.#dispatchLifecycle("ad-unit:fetch");
-    if (this.loading === "lazy") {
+    if (source === "initial" && this.loading === "lazy") {
       fetchEvent.waitUntil(this.#awaitZone("render"));
     }
     fetchEvent.endDispatch();
     if (this.#aborted || this.#cycleId !== cycleId) return;
     if (fetchEvent.pending.length === 0) {
-      this.#runRenderStage(cycleId);
+      this.#runRenderStage(source, cycleId);
       return;
     }
-    this.#awaitStage(fetchEvent, cycleId, () => this.#runRenderStage(cycleId));
+    this.#awaitStage(fetchEvent, cycleId, () =>
+      this.#runRenderStage(source, cycleId),
+    );
   }
 
-  #runRenderStage(cycleId: number): void {
+  #runRenderStage(_source: "initial" | "refresh", cycleId: number): void {
     if (this.#aborted || this.#cycleId !== cycleId) return;
     const renderEvent = this.#dispatchLifecycle("ad-unit:render");
     renderEvent.endDispatch();
