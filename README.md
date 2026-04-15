@@ -78,4 +78,7 @@ bun run test:coverage # run tests with coverage
 bun run build        # build JS bundle + type declarations
 bun run lint         # check with Biome
 bun run lint:fix     # auto-fix lint issues
+bun run lint:compat  # browser-compat check vs .browserslistrc
 ```
+
+The supported browser floor is declared in `.browserslistrc` (`baseline widely available`). `bun run lint:compat` runs [oxlint](https://oxc.rs/docs/guide/usage/linter) with [`eslint-plugin-compat`](https://github.com/amilajack/eslint-plugin-compat) loaded as a JS plugin to flag DOM/JS APIs outside that floor. Biome (`bun run lint`) remains the primary linter for style and correctness.
