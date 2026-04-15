@@ -1707,5 +1707,105 @@ describe("AdUnit", () => {
       }
       expect(fired).toBe(true);
     });
+
+    test("waitUntil on ad-unit:refresh defers fetch until the promise resolves", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveGate: () => void;
+      const gate = new Promise<void>((r) => {
+        resolveGate = r;
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      element.refresh();
+      expect(fetchFired).toBe(false);
+      expect(element.blocked).toBe(true);
+
+      resolveGate!();
+      await gate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchFired).toBe(true);
+      expect(element.blocked).toBe(false);
+    });
+
+    test("rejected waitUntil on ad-unit:refresh fires ad-unit:error with stage 'refresh'", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(
+          Promise.reject(new Error("policy")),
+        );
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      let errorDetail: { stage?: string; error?: unknown } | undefined;
+      element.addEventListener("ad-unit:error", (e) => {
+        errorDetail = (e as CustomEvent).detail;
+      });
+
+      element.refresh();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchFired).toBe(false);
+      expect(errorDetail?.stage).toBe("refresh");
+      expect((errorDetail?.error as Error).message).toBe("policy");
+    });
+
+    test("stage-blocked and stage-unblocked fire around pending refresh stage", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const events: { type: string; stage: string }[] = [];
+      element.addEventListener("ad-unit:stage-blocked", (e) => {
+        events.push({
+          type: "blocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+      element.addEventListener("ad-unit:stage-unblocked", (e) => {
+        events.push({
+          type: "unblocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+
+      let resolveGate: () => void;
+      const gate = new Promise<void>((r) => {
+        resolveGate = r;
+      });
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+
+      element.refresh();
+      expect(events).toEqual([{ type: "blocked", stage: "refresh" }]);
+
+      resolveGate!();
+      await gate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(events).toEqual([
+        { type: "blocked", stage: "refresh" },
+        { type: "unblocked", stage: "refresh" },
+      ]);
+    });
   });
 });
