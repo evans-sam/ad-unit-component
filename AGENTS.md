@@ -42,7 +42,7 @@ bun test src/ad-unit.test.ts  # single file
 bun run test:coverage         # coverage report
 bun run lint                  # Biome check
 bun run lint:fix              # Biome auto-fix
-bun run lint:compat           # browser-compat check (oxlint + eslint-plugin-compat) vs .browserslistrc
+bun run lint:compat           # browser-compat check (oxlint + eslint-plugin-compat) vs package.json#browserslist
 ```
 
 ## Architecture
