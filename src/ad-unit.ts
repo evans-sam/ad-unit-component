@@ -89,6 +89,21 @@ export class AdUnitLifecycleEvent extends CustomEvent<AdUnitLifecycleDetail> {
  * to gate `ad-unit:fetch` on the fetch zone and `ad-unit:render` on the render zone.
  * These compose with user-supplied waitUntil promises.
  *
+ * ## Refresh
+ *
+ * Call {@link refresh} to kick off a new cycle: dispatches `ad-unit:refresh`,
+ * then chains into `ad-unit:fetch` → `ad-unit:render` using the same waitUntil
+ * machinery. Refresh bypasses lazy-loading viewport gates — it is an explicit
+ * trigger. A `refresh()` call while a cycle is in flight aborts the old cycle
+ * cleanly and starts fresh.
+ *
+ * {@link refreshCount} increments by 1 immediately before each `ad-unit:refresh`
+ * dispatches, and the value is carried on every lifecycle event's `detail.refreshCount`
+ * so adapters can distinguish first-load (`0`) from the N-th refresh.
+ *
+ * Refresh scheduling (timers, viewability gates, max-count enforcement) is an
+ * adapter concern — this component exposes only the trigger primitive.
+ *
  * @example
  * ```html
  * <ad-unit code="header-ad" sizes="728x90,970x250" pos="1" gpid="/1234/homepage/header">
