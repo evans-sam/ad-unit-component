@@ -33,6 +33,7 @@ export interface AdUnitLifecycleDetail {
   pos?: number | null;
   format?: BannerFormat[] | null;
   container?: HTMLDivElement;
+  refreshCount?: number;
 }
 
 export class AdUnitLifecycleEvent extends CustomEvent<AdUnitLifecycleDetail> {
@@ -122,6 +123,7 @@ export class AdUnit extends HTMLElement {
   #cycleId = 0;
   #blockedStages = new Set<string>();
   #zoneController: AbortController | null = null;
+  #refreshCount = 0;
 
   constructor() {
     super();
@@ -290,6 +292,15 @@ export class AdUnit extends HTMLElement {
    */
   get blocked(): boolean {
     return this.#blockedStages.size > 0;
+  }
+
+  /**
+   * Number of times refresh() has been called on this element instance.
+   * 0 on initial connect; incremented immediately before each ad-unit:refresh
+   * dispatch. Persists across disconnect/reconnect of the same instance.
+   */
+  get refreshCount(): number {
+    return this.#refreshCount;
   }
 
   // --- Lifecycle ---
@@ -505,6 +516,7 @@ export class AdUnit extends HTMLElement {
         pos: this.pos,
         format: this.format,
         container: this.container,
+        refreshCount: this.#refreshCount,
       },
     });
     event.beginDispatch();

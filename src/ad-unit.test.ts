@@ -609,6 +609,49 @@ describe("AdUnit", () => {
     });
   });
 
+  describe("refreshCount", () => {
+    test("is 0 before any refresh call", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      expect(element.refreshCount).toBe(0);
+    });
+
+    test("is 0 on connected event detail for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:connected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      expect(detail?.refreshCount).toBe(0);
+    });
+
+    test("is 0 on fetch and render event details for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let fetchDetail: { refreshCount?: number } | undefined;
+      let renderDetail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        fetchDetail = (e as CustomEvent).detail;
+      });
+      element.addEventListener("ad-unit:render", (e) => {
+        renderDetail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      expect(fetchDetail?.refreshCount).toBe(0);
+      expect(renderDetail?.refreshCount).toBe(0);
+    });
+
+    test("is 0 on disconnected event detail for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:disconnected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      container.removeChild(element);
+      expect(detail?.refreshCount).toBe(0);
+    });
+  });
+
   describe("eager mode (default)", () => {
     test("fires ad-unit:fetch synchronously on connect", () => {
       const element = document.createElement("ad-unit") as AdUnit;
