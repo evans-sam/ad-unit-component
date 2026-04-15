@@ -33,6 +33,7 @@ export interface AdUnitLifecycleDetail {
   pos?: number | null;
   format?: BannerFormat[] | null;
   container?: HTMLDivElement;
+  refreshCount?: number;
 }
 
 export class AdUnitLifecycleEvent extends CustomEvent<AdUnitLifecycleDetail> {
@@ -88,6 +89,21 @@ export class AdUnitLifecycleEvent extends CustomEvent<AdUnitLifecycleDetail> {
  * to gate `ad-unit:fetch` on the fetch zone and `ad-unit:render` on the render zone.
  * These compose with user-supplied waitUntil promises.
  *
+ * ## Refresh
+ *
+ * Call {@link refresh} to kick off a new cycle: dispatches `ad-unit:refresh`,
+ * then chains into `ad-unit:fetch` → `ad-unit:render` using the same waitUntil
+ * machinery. Refresh bypasses lazy-loading viewport gates — it is an explicit
+ * trigger. A `refresh()` call while a cycle is in flight aborts the old cycle
+ * cleanly and starts fresh.
+ *
+ * {@link refreshCount} increments by 1 immediately before each `ad-unit:refresh`
+ * dispatches, and the value is carried on every lifecycle event's `detail.refreshCount`
+ * so adapters can distinguish first-load (`0`) from the N-th refresh.
+ *
+ * Refresh scheduling (timers, viewability gates, max-count enforcement) is an
+ * adapter concern — this component exposes only the trigger primitive.
+ *
  * @example
  * ```html
  * <ad-unit code="header-ad" sizes="728x90,970x250" pos="1" gpid="/1234/homepage/header">
@@ -122,6 +138,7 @@ export class AdUnit extends HTMLElement {
   #cycleId = 0;
   #blockedStages = new Set<string>();
   #zoneController: AbortController | null = null;
+  #refreshCount = 0;
 
   constructor() {
     super();
@@ -292,6 +309,15 @@ export class AdUnit extends HTMLElement {
     return this.#blockedStages.size > 0;
   }
 
+  /**
+   * Number of times refresh() has been called on this element instance.
+   * 0 on initial connect; incremented immediately before each ad-unit:refresh
+   * dispatch. Persists across disconnect/reconnect of the same instance.
+   */
+  get refreshCount(): number {
+    return this.#refreshCount;
+  }
+
   // --- Lifecycle ---
 
   connectedCallback() {
@@ -304,38 +330,60 @@ export class AdUnit extends HTMLElement {
   }
 
   #runConnectedStage(): void {
+    const cycleId = this.#cycleId;
     const connectedEvent = this.#dispatchLifecycle("ad-unit:connected");
     if (this.loading === "lazy") {
       connectedEvent.waitUntil(this.#awaitZone("fetch"));
     }
     connectedEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (connectedEvent.pending.length === 0) {
-      this.#runFetchStage();
+      this.#runFetchStage("initial", cycleId);
       return;
     }
-    this.#awaitStage(connectedEvent, () => this.#runFetchStage());
+    this.#awaitStage(connectedEvent, cycleId, () =>
+      this.#runFetchStage("initial", cycleId),
+    );
   }
 
-  #runFetchStage(): void {
-    if (this.#aborted) return;
+  #runRefreshStage(): void {
+    const cycleId = this.#cycleId;
+    const refreshEvent = this.#dispatchLifecycle("ad-unit:refresh");
+    refreshEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
+    if (refreshEvent.pending.length === 0) {
+      this.#runFetchStage("refresh", cycleId);
+      return;
+    }
+    this.#awaitStage(refreshEvent, cycleId, () =>
+      this.#runFetchStage("refresh", cycleId),
+    );
+  }
+
+  #runFetchStage(source: "initial" | "refresh", cycleId: number): void {
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     const fetchEvent = this.#dispatchLifecycle("ad-unit:fetch");
-    if (this.loading === "lazy") {
+    if (source === "initial" && this.loading === "lazy") {
       fetchEvent.waitUntil(this.#awaitZone("render"));
     }
     fetchEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (fetchEvent.pending.length === 0) {
-      this.#runRenderStage();
+      this.#runRenderStage(source, cycleId);
       return;
     }
-    this.#awaitStage(fetchEvent, () => this.#runRenderStage());
+    this.#awaitStage(fetchEvent, cycleId, () =>
+      this.#runRenderStage(source, cycleId),
+    );
   }
 
-  #runRenderStage(): void {
-    if (this.#aborted) return;
+  #runRenderStage(_source: "initial" | "refresh", cycleId: number): void {
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     const renderEvent = this.#dispatchLifecycle("ad-unit:render");
     renderEvent.endDispatch();
+    if (this.#aborted || this.#cycleId !== cycleId) return;
     if (renderEvent.pending.length === 0) return;
-    this.#awaitStage(renderEvent, () => {
+    this.#awaitStage(renderEvent, cycleId, () => {
       /* terminal stage — no downstream; #awaitStage still tracks blocked state */
     });
   }
@@ -344,9 +392,12 @@ export class AdUnit extends HTMLElement {
     return eventType.replace(/^ad-unit:/, "");
   }
 
-  #awaitStage(event: AdUnitLifecycleEvent, onResolved: () => void): void {
+  #awaitStage(
+    event: AdUnitLifecycleEvent,
+    cycleId: number,
+    onResolved: () => void,
+  ): void {
     const stage = this.#stageName(event.type);
-    const cycleId = this.#cycleId;
     this.#blockedStages.add(event.type);
     this.dispatchEvent(
       new CustomEvent("ad-unit:stage-blocked", {
@@ -360,8 +411,8 @@ export class AdUnit extends HTMLElement {
     const isStale = () => this.#aborted || this.#cycleId !== cycleId;
 
     const finalize = () => {
-      this.#blockedStages.delete(event.type);
       if (isStale()) return;
+      this.#blockedStages.delete(event.type);
       this.dispatchEvent(
         new CustomEvent("ad-unit:stage-unblocked", {
           bubbles: true,
@@ -393,6 +444,33 @@ export class AdUnit extends HTMLElement {
         );
       },
     );
+  }
+
+  /**
+   * Kicks off a new lifecycle cycle: dispatches ad-unit:refresh, then
+   * chains into ad-unit:fetch → ad-unit:render using the same waitUntil
+   * machinery as the initial connect. No-op (with console.warn) if the
+   * element is not connected. Aborts any in-flight cycle (pending
+   * waitUntil promises from the prior cycle settle into no-ops via the
+   * cycle-id stale check).
+   *
+   * Refresh bypasses lazy-loading viewport gates — the caller is
+   * explicitly asking for a refresh. Viewability-gated scheduling is
+   * a refresh-adapter concern, not a component concern.
+   */
+  refresh(): void {
+    if (!this.isConnected) {
+      console.warn(
+        `[ad-unit "${this.code}"] refresh() called on disconnected element; ignored`,
+      );
+      return;
+    }
+    this.#zoneController?.abort();
+    this.#cycleId++;
+    this.#blockedStages.clear();
+    this.#zoneController = new AbortController();
+    this.#refreshCount++;
+    this.#runRefreshStage();
   }
 
   disconnectedCallback() {
@@ -494,6 +572,7 @@ export class AdUnit extends HTMLElement {
         pos: this.pos,
         format: this.format,
         container: this.container,
+        refreshCount: this.#refreshCount,
       },
     });
     event.beginDispatch();

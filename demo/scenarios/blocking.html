@@ -3,24 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>waitUntil scenario — stub</title>
-    <link href="../stub.css" rel="stylesheet">
+    <title>waitUntil scenario · ad-unit demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+            background: #f8fafc;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        .eyebrow {
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 0 0 0.5rem;
+        }
+
+        .lede {
+            color: #475569;
+            margin: 0;
+            max-width: 720px;
+        }
+
+        .back {
+            display: inline-block;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .back:hover {
+            color: #0f172a;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        section {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        section h2 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        section p {
+            margin: 0 0 0.75rem;
+            color: #475569;
+        }
+
+        .unit-row {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 1.25rem 1.5rem;
+            align-items: center;
+        }
+
+        .unit-label {
+            font-size: 0.6875rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            grid-column: 1 / -1;
+        }
+
+        .state-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .state-chip[data-state="blocked"] {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .state-chip[data-state="ready"] {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .state-chip[data-state="error"] {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            font: inherit;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #0f172a;
+            background: #0f172a;
+            color: white;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: white;
+            color: #0f172a;
+        }
+
+        button.danger {
+            background: #b91c1c;
+            border-color: #b91c1c;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            border-color: #cbd5e1;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        aside {
+            position: sticky;
+            top: 2rem;
+        }
+
+        aside event-log {
+            display: block;
+        }
+    </style>
 </head>
 <body>
-<main class="stub">
-    <p class="stub__eyebrow">Scenario · stub</p>
-    <h1>waitUntil</h1>
-    <p>
-        This scenario will demonstrate a listener calling
-        <code>event.waitUntil(promise)</code> on <code>ad-unit:fetch</code> to hold
-        the lifecycle until a bid promise resolves, then advancing automatically
-        — the coordination hook adapters will use to wait on bid responses.
+<a class="back" href="/">← back to demo index</a>
+
+<header>
+    <p class="eyebrow">Scenario</p>
+    <h1>waitUntil — user-controlled gate</h1>
+    <p class="lede">
+        Listeners call <code>event.waitUntil(promise)</code> on a lifecycle event
+        to hold progression to the next stage. The mock adapter already does this
+        to gate <code>ad-unit:render</code> on its simulated auction. Below, a
+        <strong>user listener</strong> adds a second <code>waitUntil</code> on
+        <code>ad-unit:fetch</code> — both waiters must settle (Promise.all) before
+        render fires.
     </p>
-    <p>
-        Lands with issue <a href="https://github.com/evans-sam/ad-unit-component/issues/5">#5 — waitUntil lifecycle
-        blocking</a>.
-    </p>
-    <p><a class="stub__back" href="/">← back to demo index</a></p>
-</main>
+</header>
+
+<div class="layout">
+    <div>
+        <section>
+            <h2>Unit 1 — adapter only (baseline)</h2>
+            <p>
+                Only the mock adapter listens. <code>ad-unit:fetch</code> →
+                <code>waitUntil(auctionPromise)</code> → resolves after 500ms →
+                <code>ad-unit:render</code>.
+            </p>
+            <div class="unit-row">
+                <span class="unit-label">Leaderboard · 728×90 · adapter-only</span>
+                <ad-unit code="baseline" sizes="728x90" gpid="/1234/demo/baseline" pos="1">
+                    Baseline
+                </ad-unit>
+                <span class="state-chip" data-state="idle" id="state-baseline">idle</span>
+            </div>
+        </section>
+
+        <section>
+            <h2>Unit 2 — adapter + user gate</h2>
+            <p>
+                A custom listener on <code>ad-unit:fetch</code> adds
+                <code>waitUntil(userGate)</code>. Render will not fire until
+                both the adapter auction AND the user gate resolve. Use the
+                buttons to resolve or reject the user gate; observe the
+                <code>stage-blocked</code> / <code>stage-unblocked</code> and
+                <code>ad-unit:error</code> events in the log.
+            </p>
+            <div class="unit-row">
+                <span class="unit-label">Medium rectangle · 300×250 · user-gated</span>
+                <ad-unit code="user-gated" sizes="300x250" gpid="/1234/demo/user-gated" pos="1">
+                    User-gated
+                </ad-unit>
+                <span class="state-chip" data-state="idle" id="state-user-gated">idle</span>
+            </div>
+            <div class="controls" style="margin-top:1rem;">
+                <button id="resolve-btn" type="button" disabled>Resolve gate</button>
+                <button class="danger" id="reject-btn" type="button" disabled>Reject gate (fires ad-unit:error)</button>
+                <button class="secondary" id="reset-btn" type="button">Reset unit</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>What to watch in the log</h2>
+            <p>
+                <code>ad-unit:stage-blocked</code> fires when
+                <code>adUnit.blocked</code> flips true. When all
+                <code>waitUntil</code> promises settle, <code>stage-unblocked</code>
+                fires and the next stage dispatches. A <em>rejected</em>
+                <code>waitUntil</code> halts the lifecycle and fires
+                <code>ad-unit:error</code> with the rejection reason.
+            </p>
+        </section>
+    </div>
+
+    <aside>
+        <event-log></event-log>
+    </aside>
+</div>
+
+<script src="./blocking.ts" type="module"></script>
 </body>
 </html>

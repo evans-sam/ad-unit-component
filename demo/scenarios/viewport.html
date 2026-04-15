@@ -3,23 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Viewport scenario — stub</title>
-    <link href="../stub.css" rel="stylesheet">
+    <title>Viewport scenario · ad-unit demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 3rem 2rem 6rem;
+            background: #f8fafc;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        .eyebrow {
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 0 0 0.5rem;
+        }
+
+        .lede {
+            color: #475569;
+            margin: 0 0 1rem;
+            max-width: 720px;
+        }
+
+        .back {
+            display: inline-block;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .back:hover {
+            color: #0f172a;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        section {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        section h2 {
+            margin: 0 0 0.5rem;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        section p {
+            margin: 0 0 0.75rem;
+            color: #475569;
+        }
+
+        section dl {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 0.25rem 1rem;
+            margin: 0;
+            font-size: 0.875rem;
+        }
+
+        section dt {
+            font-weight: 600;
+            color: #334155;
+        }
+
+        section dd {
+            margin: 0;
+            color: #475569;
+        }
+
+        .filler {
+            background: linear-gradient(180deg, #e0e7ff, #fef3c7);
+            border: 1px dashed #c7d2fe;
+            border-radius: 8px;
+            height: 900px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 0.875rem;
+            margin: 1.5rem 0;
+        }
+
+        .unit-wrap {
+            display: inline-flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .unit-wrap__label {
+            font-size: 0.6875rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        aside {
+            position: sticky;
+            top: 2rem;
+        }
+
+        aside event-log {
+            display: block;
+        }
+
+        .scroll-hint {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #f1f5f9;
+            font-size: 0.8125rem;
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            pointer-events: none;
+            opacity: 0.85;
+        }
+    </style>
 </head>
 <body>
-<main class="stub">
-    <p class="stub__eyebrow">Scenario · stub</p>
-    <h1>Viewport entry</h1>
-    <p>
-        This scenario will demonstrate <code>ad-unit:fetch</code> and
-        <code>ad-unit:render</code> events firing as ad units enter
-        their <code>fetch-margin</code> / <code>render-margin</code> zones.
+<a class="back" href="/">← back to demo index</a>
+
+<header>
+    <p class="eyebrow">Scenario</p>
+    <h1>Viewport entry (lazy loading)</h1>
+    <p class="lede">
+        Three <code>&lt;ad-unit loading="lazy"&gt;</code> elements below the fold.
+        Each has a wide <code>fetch-margin</code> (auction starts while still
+        offscreen) and a tighter <code>render-margin</code> (creative paints as
+        the slot nears view). Scroll down and watch the event log on the right —
+        <code>ad-unit:fetch</code> fires first (far zone), then
+        <code>ad-unit:render</code> (near zone).
     </p>
-    <p>
-        Lands with issue <a href="https://github.com/evans-sam/ad-unit-component/issues/4">#4 — IntersectionObserver
-        viewport detection</a>.
-    </p>
-    <p><a class="stub__back" href="/">← back to demo index</a></p>
-</main>
+</header>
+
+<div class="layout">
+    <div>
+        <section>
+            <h2>How lazy loading works</h2>
+            <p>
+                When <code>loading="lazy"</code>, the component attaches built-in
+                <code>waitUntil(viewport-zone-promise)</code> gates:
+            </p>
+            <dl>
+                <dt>fetch zone</dt>
+                <dd>
+                    <code>ad-unit:connected</code> waits until the element intersects
+                    the fetch zone (configured by <code>fetch-margin</code>) before
+                    dispatching <code>ad-unit:fetch</code>.
+                </dd>
+                <dt>render zone</dt>
+                <dd>
+                    <code>ad-unit:fetch</code> waits until the element intersects the
+                    render zone (configured by <code>render-margin</code>) before
+                    dispatching <code>ad-unit:render</code>.
+                </dd>
+            </dl>
+            <p>
+                The mock adapter is unchanged from eager mode: it hooks
+                <code>ad-unit:fetch</code> to paint "auctioning…" then
+                <code>ad-unit:render</code> to paint the winning bid. Lazy gating
+                is purely a component concern.
+            </p>
+        </section>
+
+        <div class="filler">Scroll down — lazy units below</div>
+
+        <section>
+            <h2>Unit A · fetch-margin 500px · render-margin 100px</h2>
+            <p>
+                Fetch fires when the top of this unit is within 500px of the
+                viewport. Render waits until within 100px.
+            </p>
+            <div class="unit-wrap">
+                <span class="unit-wrap__label">Leaderboard · 728×90</span>
+                <ad-unit
+                    code="lazy-a"
+                    sizes="728x90"
+                    loading="lazy"
+                    fetch-margin="500px"
+                    render-margin="100px"
+                    gpid="/1234/home/lazy-a"
+                    pos="3"
+                >Unit A</ad-unit>
+            </div>
+        </section>
+
+        <div class="filler">Keep scrolling…</div>
+
+        <section>
+            <h2>Unit B · fetch-margin 200% · render-margin 50%</h2>
+            <p>
+                Percent-based margins scale with viewport size. 200% means fetch
+                fires when the unit is two viewport-heights away; render waits
+                until half a viewport away.
+            </p>
+            <div class="unit-wrap">
+                <span class="unit-wrap__label">Medium rectangle · 300×250</span>
+                <ad-unit
+                    code="lazy-b"
+                    sizes="300x250"
+                    loading="lazy"
+                    fetch-margin="200%"
+                    render-margin="50%"
+                    gpid="/1234/home/lazy-b"
+                    pos="3"
+                >Unit B</ad-unit>
+            </div>
+        </section>
+
+        <div class="filler">One more…</div>
+
+        <section>
+            <h2>Unit C · defaults (fetch 200%, render 150%)</h2>
+            <p>
+                Omit both attributes to accept the component defaults. Both zones
+                are wide so the two events can fire nearly together on a fast
+                scroll.
+            </p>
+            <div class="unit-wrap">
+                <span class="unit-wrap__label">Half page · 300×600</span>
+                <ad-unit
+                    code="lazy-c"
+                    sizes="300x600"
+                    loading="lazy"
+                    gpid="/1234/home/lazy-c"
+                    pos="3"
+                >Unit C</ad-unit>
+            </div>
+        </section>
+    </div>
+
+    <aside>
+        <event-log></event-log>
+    </aside>
+</div>
+
+<div class="scroll-hint">scroll to trigger viewport zones ↓</div>
+
+<script src="./viewport.ts" type="module"></script>
 </body>
 </html>

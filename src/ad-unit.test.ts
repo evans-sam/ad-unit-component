@@ -609,6 +609,108 @@ describe("AdUnit", () => {
     });
   });
 
+  describe("refreshCount", () => {
+    test("is 0 before any refresh call", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      expect(element.refreshCount).toBe(0);
+    });
+
+    test("is 0 on connected event detail for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:connected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      expect(detail?.refreshCount).toBe(0);
+    });
+
+    test("is 0 on fetch and render event details for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let fetchDetail: { refreshCount?: number } | undefined;
+      let renderDetail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:fetch", (e) => {
+        fetchDetail = (e as CustomEvent).detail;
+      });
+      element.addEventListener("ad-unit:render", (e) => {
+        renderDetail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      expect(fetchDetail?.refreshCount).toBe(0);
+      expect(renderDetail?.refreshCount).toBe(0);
+    });
+
+    test("is 0 on disconnected event detail for initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:disconnected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      container.appendChild(element);
+      container.removeChild(element);
+      expect(detail?.refreshCount).toBe(0);
+    });
+
+    test("increments to 1 after first refresh, 2 after second", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      expect(element.refreshCount).toBe(0);
+      element.refresh();
+      expect(element.refreshCount).toBe(1);
+      element.refresh();
+      expect(element.refreshCount).toBe(2);
+    });
+
+    test("refresh, fetch, and render events in a refresh cycle all carry the new count", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const seen: number[] = [];
+      const capture = (e: Event) => {
+        seen.push((e as CustomEvent).detail.refreshCount);
+      };
+      element.addEventListener("ad-unit:refresh", capture);
+      element.addEventListener("ad-unit:fetch", capture);
+      element.addEventListener("ad-unit:render", capture);
+
+      element.refresh();
+
+      expect(seen).toEqual([1, 1, 1]);
+    });
+
+    test("persists across disconnect and reconnect of the same instance", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      element.refresh();
+      element.refresh();
+      expect(element.refreshCount).toBe(2);
+
+      container.removeChild(element);
+      container.appendChild(element);
+
+      expect(element.refreshCount).toBe(2);
+    });
+
+    test("is 2 on connected event detail after reconnect that followed two refreshes", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      element.refresh();
+      element.refresh();
+
+      let detail: { refreshCount?: number } | undefined;
+      element.addEventListener("ad-unit:connected", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+
+      container.removeChild(element);
+      container.appendChild(element);
+
+      expect(detail?.refreshCount).toBe(2);
+    });
+  });
+
   describe("eager mode (default)", () => {
     test("fires ad-unit:fetch synchronously on connect", () => {
       const element = document.createElement("ad-unit") as AdUnit;
@@ -975,7 +1077,7 @@ describe("AdUnit", () => {
       await Promise.resolve();
       expect(renderFired).toBe(false);
 
-      resolveAuction!();
+      resolveAuction?.();
       await auction;
       await Promise.resolve();
       await Promise.resolve();
@@ -1075,9 +1177,9 @@ describe("AdUnit", () => {
         await Promise.resolve();
 
         expect(errorDetail).not.toBeNull();
-        expect(errorDetail!.stage).toBe("connected");
-        expect(errorDetail!.error).toBeInstanceOf(Error);
-        expect((errorDetail!.error as Error).message).toContain(
+        expect(errorDetail?.stage).toBe("connected");
+        expect(errorDetail?.error).toBeInstanceOf(Error);
+        expect((errorDetail?.error as Error).message).toContain(
           `[ad-unit "test-ad"] Invalid fetch-margin "banana":`,
         );
       } finally {
@@ -1120,7 +1222,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(fetchFired).toBe(false); // async path
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve(); // let chained then run
 
@@ -1145,7 +1247,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(renderFired).toBe(false);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1176,12 +1278,12 @@ describe("AdUnit", () => {
 
       container.appendChild(element);
 
-      resolveA!();
+      resolveA?.();
       await gateA;
       await Promise.resolve();
       expect(renderFired).toBe(false); // B still pending
 
-      resolveB!();
+      resolveB?.();
       await gateB;
       await Promise.resolve();
       expect(renderFired).toBe(true);
@@ -1205,7 +1307,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       container.removeChild(element); // disconnect before gate resolves
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1236,8 +1338,8 @@ describe("AdUnit", () => {
 
       expect(renderFired).toBe(false);
       expect(errorDetail).not.toBeNull();
-      expect(errorDetail!.stage).toBe("fetch");
-      expect(errorDetail!.error).toBe(error);
+      expect(errorDetail?.stage).toBe("fetch");
+      expect(errorDetail?.error).toBe(error);
     });
 
     test("AbortError on zone promise does not dispatch ad-unit:error", async () => {
@@ -1309,7 +1411,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(element.blocked).toBe(true);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1355,7 +1457,7 @@ describe("AdUnit", () => {
       container.appendChild(element);
       expect(events).toEqual([{ type: "blocked", stage: "fetch" }]);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1386,7 +1488,7 @@ describe("AdUnit", () => {
       expect(element.blocked).toBe(false);
 
       // Allow the stale gate to resolve — must not revive blocked state.
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
 
@@ -1414,12 +1516,58 @@ describe("AdUnit", () => {
       element.removeEventListener("ad-unit:fetch", fetchHandler);
       container.appendChild(element);
 
-      resolve!();
+      resolve?.();
       await gate;
       await Promise.resolve();
       await Promise.resolve();
 
       expect(unblockedStages).toEqual([]);
+    });
+
+    test("old cycle's finalize does not clear new cycle's blocked entry after reconnect", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let resolveStale: () => void;
+      const staleGate = new Promise<void>((r) => {
+        resolveStale = r;
+      });
+      const staleHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(staleGate);
+      };
+      element.addEventListener("ad-unit:fetch", staleHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      container.removeChild(element);
+      element.removeEventListener("ad-unit:fetch", staleHandler);
+
+      let resolveFresh: () => void;
+      const freshGate = new Promise<void>((r) => {
+        resolveFresh = r;
+      });
+      const freshHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(freshGate);
+      };
+      element.addEventListener("ad-unit:fetch", freshHandler);
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      resolveStale?.();
+      await staleGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // New cycle still pending — blocked must remain true.
+      expect(element.blocked).toBe(true);
+
+      resolveFresh?.();
+      await freshGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
     });
   });
 
@@ -1466,6 +1614,463 @@ describe("AdUnit", () => {
       event.beginDispatch();
       event.endDispatch();
       expect(() => event.waitUntil(Promise.resolve())).toThrow();
+    });
+  });
+
+  describe("refresh()", () => {
+    test("dispatches ad-unit:refresh on the element", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+      element.refresh();
+      expect(fired).toBe(true);
+    });
+
+    test("refresh event is an AdUnitLifecycleEvent with correct flags", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let captured: Event | undefined;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        captured = e;
+      });
+      element.refresh();
+
+      expect(captured).toBeInstanceOf(AdUnitLifecycleEvent);
+      expect(captured?.bubbles).toBe(true);
+      expect(captured?.composed).toBe(true);
+      expect(captured?.cancelable).toBe(false);
+    });
+
+    test("refresh event detail carries full configuration plus refreshCount", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("code", "test-ad");
+      element.setAttribute("sizes", "300x250");
+      element.setAttribute("gpid", "/123/home");
+      element.setAttribute("pos", "1");
+      container.appendChild(element);
+
+      let detail:
+        | {
+            code?: string;
+            sizes?: number[][];
+            gpid?: string | null;
+            pos?: number | null;
+            container?: HTMLDivElement;
+            refreshCount?: number;
+          }
+        | undefined;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        detail = (e as CustomEvent).detail;
+      });
+      element.refresh();
+
+      expect(detail?.code).toBe("test-ad");
+      expect(detail?.sizes).toEqual([[300, 250]]);
+      expect(detail?.gpid).toBe("/123/home");
+      expect(detail?.pos).toBe(1);
+      expect(detail?.container).toBe(element.container);
+      expect(detail?.refreshCount).toBe(1);
+    });
+
+    test("refresh chains refresh → fetch → render in order", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const order: string[] = [];
+      element.addEventListener("ad-unit:refresh", () => order.push("refresh"));
+      element.addEventListener("ad-unit:fetch", () => order.push("fetch"));
+      element.addEventListener("ad-unit:render", () => order.push("render"));
+
+      element.refresh();
+
+      expect(order).toEqual(["refresh", "fetch", "render"]);
+    });
+
+    test("document-level listener receives ad-unit:refresh (bubbles + composed)", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let fired = false;
+      const handler = () => {
+        fired = true;
+      };
+      document.addEventListener("ad-unit:refresh", handler);
+      try {
+        element.refresh();
+      } finally {
+        document.removeEventListener("ad-unit:refresh", handler);
+      }
+      expect(fired).toBe(true);
+    });
+
+    test("waitUntil on ad-unit:refresh defers fetch until the promise resolves", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveGate: () => void;
+      const gate = new Promise<void>((r) => {
+        resolveGate = r;
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      element.refresh();
+      expect(fetchFired).toBe(false);
+      expect(element.blocked).toBe(true);
+
+      resolveGate?.();
+      await gate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchFired).toBe(true);
+      expect(element.blocked).toBe(false);
+    });
+
+    test("rejected waitUntil on ad-unit:refresh fires ad-unit:error with stage 'refresh'", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(
+          Promise.reject(new Error("policy")),
+        );
+      });
+
+      let fetchFired = false;
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchFired = true;
+      });
+
+      let errorDetail: { stage?: string; error?: unknown } | undefined;
+      element.addEventListener("ad-unit:error", (e) => {
+        errorDetail = (e as CustomEvent).detail;
+      });
+
+      element.refresh();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchFired).toBe(false);
+      expect(errorDetail?.stage).toBe("refresh");
+      expect((errorDetail?.error as Error).message).toBe("policy");
+    });
+
+    test("stage-blocked and stage-unblocked fire around pending refresh stage", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const events: { type: string; stage: string }[] = [];
+      element.addEventListener("ad-unit:stage-blocked", (e) => {
+        events.push({
+          type: "blocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+      element.addEventListener("ad-unit:stage-unblocked", (e) => {
+        events.push({
+          type: "unblocked",
+          stage: (e as CustomEvent).detail.stage,
+        });
+      });
+
+      let resolveGate: () => void;
+      const gate = new Promise<void>((r) => {
+        resolveGate = r;
+      });
+      element.addEventListener("ad-unit:refresh", (e) => {
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      });
+
+      element.refresh();
+      expect(events).toEqual([{ type: "blocked", stage: "refresh" }]);
+
+      resolveGate?.();
+      await gate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(events).toEqual([
+        { type: "blocked", stage: "refresh" },
+        { type: "unblocked", stage: "refresh" },
+      ]);
+    });
+
+    test("refresh on never-connected element warns and no-ops", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+
+      const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        element.refresh();
+        expect(fired).toBe(false);
+        expect(element.refreshCount).toBe(0);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test("refresh on element after disconnect warns and no-ops", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+      container.removeChild(element);
+
+      let fired = false;
+      element.addEventListener("ad-unit:refresh", () => {
+        fired = true;
+      });
+
+      const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        element.refresh();
+        expect(fired).toBe(false);
+        expect(element.refreshCount).toBe(0);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test("refresh while initial ad-unit:fetch is blocked aborts old cycle and starts a new one", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let resolveStale: () => void;
+      const staleGate = new Promise<void>((r) => {
+        resolveStale = r;
+      });
+      const staleFetchHandler = (e: Event) => {
+        (e as AdUnitLifecycleEvent).waitUntil(staleGate);
+      };
+      element.addEventListener("ad-unit:fetch", staleFetchHandler);
+
+      let renderCount = 0;
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      container.appendChild(element);
+      expect(element.blocked).toBe(true);
+
+      element.removeEventListener("ad-unit:fetch", staleFetchHandler);
+      element.refresh();
+
+      // New cycle completes synchronously (no listeners blocking fetch)
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+
+      // Old promise resolves — must not retrigger anything
+      resolveStale?.();
+      await staleGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+    });
+
+    test("two refreshes in rapid succession: only the newest cycle's fetch/render complete", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveFirst: () => void;
+      const firstGate = new Promise<void>((r) => {
+        resolveFirst = r;
+      });
+
+      let refreshCalls = 0;
+      const refreshHandler = (e: Event) => {
+        refreshCalls++;
+        if (refreshCalls === 1) {
+          (e as AdUnitLifecycleEvent).waitUntil(firstGate);
+        }
+      };
+      element.addEventListener("ad-unit:refresh", refreshHandler);
+
+      let renderCount = 0;
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      element.refresh(); // first refresh: blocks on firstGate
+      expect(element.blocked).toBe(true);
+      expect(renderCount).toBe(0);
+
+      element.refresh(); // second refresh: aborts first, runs synchronously
+      expect(renderCount).toBe(1);
+      expect(element.blocked).toBe(false);
+
+      // First gate resolves post-hoc — stale, must not advance
+      resolveFirst?.();
+      await firstGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderCount).toBe(1);
+    });
+
+    test("adUnit.blocked tracks only the newest cycle", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      let resolveFirst: () => void;
+      const firstGate = new Promise<void>((r) => {
+        resolveFirst = r;
+      });
+      let resolveSecond: () => void;
+      const secondGate = new Promise<void>((r) => {
+        resolveSecond = r;
+      });
+
+      let call = 0;
+      const handler = (e: Event) => {
+        call++;
+        const gate = call === 1 ? firstGate : secondGate;
+        (e as AdUnitLifecycleEvent).waitUntil(gate);
+      };
+      element.addEventListener("ad-unit:refresh", handler);
+
+      element.refresh();
+      expect(element.blocked).toBe(true);
+
+      element.refresh();
+      expect(element.blocked).toBe(true); // still blocked — new cycle's gate pending
+
+      resolveFirst?.();
+      await firstGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(true); // still blocked — second gate not resolved yet
+
+      resolveSecond?.();
+      await secondGate;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(element.blocked).toBe(false);
+    });
+
+    test("refresh on lazy-loaded element fires fetch and render without waiting for viewport", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("loading", "lazy");
+      container.appendChild(element);
+
+      // Initial connect: fetch and render blocked on zone observers — element is offscreen
+      let fetchCount = 0;
+      let renderCount = 0;
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      // Sanity: fetch has not fired yet (no intersection triggered)
+      expect(fetchCount).toBe(0);
+
+      const observersBeforeRefresh = MockIntersectionObserver.instances.length;
+
+      element.refresh();
+      // Sync chain — refresh → fetch → render all fire synchronously, no zone gating
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
+
+      // No new IntersectionObserver instances were created by refresh()
+      expect(MockIntersectionObserver.instances.length).toBe(
+        observersBeforeRefresh,
+      );
+    });
+
+    test("refresh does not re-attach zone observers", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("loading", "lazy");
+      container.appendChild(element);
+
+      const initialCount = MockIntersectionObserver.instances.length;
+      element.refresh();
+      element.refresh();
+      element.refresh();
+
+      expect(MockIntersectionObserver.instances.length).toBe(initialCount);
+    });
+
+    test("refresh called inside ad-unit:refresh listener preempts outer cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const refreshCounts: number[] = [];
+      let fetchCount = 0;
+      let renderCount = 0;
+
+      element.addEventListener("ad-unit:refresh", (e) => {
+        refreshCounts.push((e as CustomEvent).detail.refreshCount);
+        if (refreshCounts.length === 1) {
+          element.refresh(); // nested
+        }
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      element.refresh();
+
+      // Two refresh dispatches observed (outer + inner)
+      expect(refreshCounts).toEqual([1, 2]);
+      // Only the inner cycle's fetch/render run; outer is preempted
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
+    });
+
+    test("refresh called inside ad-unit:connected listener preempts initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let connectedFired = false;
+      let fetchCount = 0;
+      let renderCount = 0;
+      const refreshCounts: number[] = [];
+
+      element.addEventListener("ad-unit:connected", () => {
+        if (!connectedFired) {
+          connectedFired = true;
+          element.refresh(); // nested inside connected
+        }
+      });
+      element.addEventListener("ad-unit:refresh", (e) => {
+        refreshCounts.push((e as CustomEvent).detail.refreshCount);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      container.appendChild(element);
+
+      // Initial cycle's fetch/render were preempted; refresh cycle's ran instead
+      expect(refreshCounts).toEqual([1]);
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
     });
   });
 });
