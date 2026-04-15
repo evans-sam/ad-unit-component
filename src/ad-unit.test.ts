@@ -2010,5 +2010,67 @@ describe("AdUnit", () => {
 
       expect(MockIntersectionObserver.instances.length).toBe(initialCount);
     });
+
+    test("refresh called inside ad-unit:refresh listener preempts outer cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      container.appendChild(element);
+
+      const refreshCounts: number[] = [];
+      let fetchCount = 0;
+      let renderCount = 0;
+
+      element.addEventListener("ad-unit:refresh", (e) => {
+        refreshCounts.push((e as CustomEvent).detail.refreshCount);
+        if (refreshCounts.length === 1) {
+          element.refresh(); // nested
+        }
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      element.refresh();
+
+      // Two refresh dispatches observed (outer + inner)
+      expect(refreshCounts).toEqual([1, 2]);
+      // Only the inner cycle's fetch/render run; outer is preempted
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
+    });
+
+    test("refresh called inside ad-unit:connected listener preempts initial cycle", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+
+      let connectedFired = false;
+      let fetchCount = 0;
+      let renderCount = 0;
+      const refreshCounts: number[] = [];
+
+      element.addEventListener("ad-unit:connected", () => {
+        if (!connectedFired) {
+          connectedFired = true;
+          element.refresh(); // nested inside connected
+        }
+      });
+      element.addEventListener("ad-unit:refresh", (e) => {
+        refreshCounts.push((e as CustomEvent).detail.refreshCount);
+      });
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      container.appendChild(element);
+
+      // Initial cycle's fetch/render were preempted; refresh cycle's ran instead
+      expect(refreshCounts).toEqual([1]);
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
+    });
   });
 });
