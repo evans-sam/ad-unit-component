@@ -1966,5 +1966,49 @@ describe("AdUnit", () => {
 
       expect(element.blocked).toBe(false);
     });
+
+    test("refresh on lazy-loaded element fires fetch and render without waiting for viewport", async () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("loading", "lazy");
+      container.appendChild(element);
+
+      // Initial connect: fetch and render blocked on zone observers — element is offscreen
+      let fetchCount = 0;
+      let renderCount = 0;
+      element.addEventListener("ad-unit:fetch", () => {
+        fetchCount++;
+      });
+      element.addEventListener("ad-unit:render", () => {
+        renderCount++;
+      });
+
+      // Sanity: fetch has not fired yet (no intersection triggered)
+      expect(fetchCount).toBe(0);
+
+      const observersBeforeRefresh = MockIntersectionObserver.instances.length;
+
+      element.refresh();
+      // Sync chain — refresh → fetch → render all fire synchronously, no zone gating
+      expect(fetchCount).toBe(1);
+      expect(renderCount).toBe(1);
+
+      // No new IntersectionObserver instances were created by refresh()
+      expect(MockIntersectionObserver.instances.length).toBe(
+        observersBeforeRefresh,
+      );
+    });
+
+    test("refresh does not re-attach zone observers", () => {
+      const element = document.createElement("ad-unit") as AdUnit;
+      element.setAttribute("loading", "lazy");
+      container.appendChild(element);
+
+      const initialCount = MockIntersectionObserver.instances.length;
+      element.refresh();
+      element.refresh();
+      element.refresh();
+
+      expect(MockIntersectionObserver.instances.length).toBe(initialCount);
+    });
   });
 });
