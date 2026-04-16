@@ -17,7 +17,6 @@
     "gam",
     "openrtb"
   ],
-  "module": "index.ts",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -40,24 +39,34 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./adapters/gam": {
-      "import": "./dist/adapters/gam.js",
-      "types": "./dist/adapters/gam.d.ts"
+      "import": {
+        "types": "./dist/adapters/gam.d.ts",
+        "default": "./dist/adapters/gam.js"
+      }
     },
     "./adapters/prebid": {
-      "import": "./dist/adapters/prebid.js",
-      "types": "./dist/adapters/prebid.d.ts"
+      "import": {
+        "types": "./dist/adapters/prebid.d.ts",
+        "default": "./dist/adapters/prebid.js"
+      }
     },
     "./adapters/apstag": {
-      "import": "./dist/adapters/apstag.js",
-      "types": "./dist/adapters/apstag.d.ts"
+      "import": {
+        "types": "./dist/adapters/apstag.d.ts",
+        "default": "./dist/adapters/apstag.js"
+      }
     },
     "./adapters/*": {
-      "import": "./dist/adapters/*.js",
-      "types": "./dist/adapters/*.d.ts"
+      "import": {
+        "types": "./dist/adapters/*.d.ts",
+        "default": "./dist/adapters/*.js"
+      }
     }
   },
   "devDependencies": {
