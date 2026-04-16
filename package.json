@@ -42,6 +42,22 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./adapters/gam": {
+      "import": "./dist/adapters/gam.js",
+      "types": "./dist/adapters/gam.d.ts"
+    },
+    "./adapters/prebid": {
+      "import": "./dist/adapters/prebid.js",
+      "types": "./dist/adapters/prebid.d.ts"
+    },
+    "./adapters/apstag": {
+      "import": "./dist/adapters/apstag.js",
+      "types": "./dist/adapters/apstag.d.ts"
+    },
+    "./adapters/*": {
+      "import": "./dist/adapters/*.js",
+      "types": "./dist/adapters/*.d.ts"
     }
   },
   "devDependencies": {
