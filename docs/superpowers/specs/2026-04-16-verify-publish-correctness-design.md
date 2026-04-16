@@ -61,8 +61,10 @@ The tradeoff: stricter than the original ask. The first run will likely surface 
 ### attw flags
 
 - `--pack .` — packs the current directory as a tarball internally and analyzes that. The check runs against exactly what `npm publish` would ship, including the `files` field's effect on what gets included.
-- `--ignore-rules cjs-resolves-to-esm` — the package is ESM-only by design (no `require` condition, no `.cjs` output, `"type": "module"`). This rule fires on every entry; suppressing it is correct, not a workaround. Other CJS-related rules are left unsuppressed unless the first run shows them firing as expected noise.
-- `no-resolution` and `untyped-resolution` are deliberately **not** suppressed — those are precisely the rules that catch the "exports path doesn't exist" gap this work is closing.
+- `--ignore-rules cjs-resolves-to-esm,no-resolution` — both rules are suppressed for documented design reasons:
+  - `cjs-resolves-to-esm`: the package is ESM-only by design (no `require` condition, no `.cjs` output, `"type": "module"`). Fires on every entry; suppression is the correct expression of the design choice, not a workaround.
+  - `no-resolution`: fires for adapter subpaths under `node10` resolution, because node10 ignores the `exports` map entirely. Any package with subpath exports inherently fails on node10. This is an inherent limitation of node10 tooling, not a package defect.
+- `untyped-resolution` is deliberately **not** suppressed — it catches the "exports path exists but types condition is wrong" gap. The decision to suppress `no-resolution` (above) was made after the first baseline run; the gap-closure probe in Task 5 verifies that wildcard/typo bugs still trigger a different attw rule and fail the build.
 
 ### publint flags
 
