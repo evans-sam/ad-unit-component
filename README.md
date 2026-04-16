@@ -5,14 +5,14 @@ A vendor-agnostic `<ad-unit>` web component. Declare ad slots in HTML; external 
 ## Install
 
 ```bash
-bun install ad-unit-component
+npm install @ad-unit/core
 ```
 
 ## Usage
 
 ```html
 <script type="module">
-  import "ad-unit-component";
+  import "@ad-unit/core";
 </script>
 
 <ad-unit
@@ -48,7 +48,7 @@ ad-unit:connected → ad-unit:fetch → ad-unit:render
 Each event is an `AdUnitLifecycleEvent`. Listeners can hold progression to the next stage by calling `event.waitUntil(promise)`. Multiple listeners compose — all pending promises are awaited via `Promise.all` before the next event fires.
 
 ```ts
-import type { AdUnitLifecycleEvent } from "ad-unit-component";
+import type { AdUnitLifecycleEvent } from "@ad-unit/core";
 
 adUnit.addEventListener("ad-unit:fetch", (e) => {
   const event = e as AdUnitLifecycleEvent;
