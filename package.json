@@ -1,6 +1,22 @@
 {
-  "name": "ad-unit-component",
+  "name": "@ad-unit/core",
   "version": "0.1.0",
+  "description": "Vendor-agnostic <ad-unit> web component — declare ad slots in HTML, handle vendor behavior through lifecycle event adapters",
+  "license": "MIT",
+  "author": "Sam Evans (https://github.com/evans-sam)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evans-sam/ad-unit-component.git"
+  },
+  "keywords": [
+    "web-component",
+    "custom-element",
+    "ad-unit",
+    "advertising",
+    "prebid",
+    "gam",
+    "openrtb"
+  ],
   "module": "index.ts",
   "type": "module",
   "main": "dist/index.js",
@@ -38,5 +54,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

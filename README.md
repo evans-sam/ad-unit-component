@@ -5,14 +5,14 @@ A vendor-agnostic `<ad-unit>` web component. Declare ad slots in HTML; external 
 ## Install
 
 ```bash
-bun install ad-unit-component
+npm install @ad-unit/core
 ```
 
 ## Usage
 
 ```html
 <script type="module">
-  import "ad-unit-component";
+  import "@ad-unit/core";
 </script>
 
 <ad-unit
@@ -48,7 +48,7 @@ ad-unit:connected → ad-unit:fetch → ad-unit:render
 Each event is an `AdUnitLifecycleEvent`. Listeners can hold progression to the next stage by calling `event.waitUntil(promise)`. Multiple listeners compose — all pending promises are awaited via `Promise.all` before the next event fires.
 
 ```ts
-import type { AdUnitLifecycleEvent } from "ad-unit-component";
+import type { AdUnitLifecycleEvent } from "@ad-unit/core";
 
 adUnit.addEventListener("ad-unit:fetch", (e) => {
   const event = e as AdUnitLifecycleEvent;
@@ -67,6 +67,39 @@ With `loading="lazy"`, the component attaches internal `waitUntil` gates to `ad-
 - `adUnit.blocked` — `true` while any stage is awaiting a `waitUntil` promise
 - `ad-unit:stage-blocked` / `ad-unit:stage-unblocked` — transition events (`detail: { stage }`)
 - `ad-unit:error` — fires if any `waitUntil` promise rejects; halts the lifecycle (`detail: { stage, error }`)
+
+### Refresh
+
+Call `adUnit.refresh()` to trigger a new lifecycle cycle:
+
+```
+ad-unit:refresh → ad-unit:fetch → ad-unit:render
+```
+
+Refresh reuses the same `waitUntil` stage machinery as the initial connect, but bypasses lazy-loading viewport gates — it is an explicit trigger.
+
+```ts
+const adUnit = document.querySelector("ad-unit") as AdUnit;
+adUnit.refresh();
+```
+
+`adUnit.refreshCount` (readonly) increments before each `ad-unit:refresh` dispatch. The value is carried on every event's `detail.refreshCount`, so adapters can distinguish first-load (`0`) from the N-th refresh. If `refresh()` is called while a cycle is already in flight, the old cycle is aborted and a new one starts. Calling `refresh()` on a disconnected element is a no-op with a console warning.
+
+Scheduling, viewability-gated refresh, max-count caps, and auction batching are adapter concerns — the component exposes only the trigger primitive.
+
+## Adapters
+
+`<ad-unit>` is vendor-agnostic. Vendor-specific behavior (Prebid, GAM, apstag) lives in external adapter packages that subscribe to lifecycle events and act on the component's public surface. The component never imports a vendor SDK.
+
+```ts
+// Example: a simple adapter that runs an auction on fetch
+document.addEventListener("ad-unit:fetch", (e) => {
+  const event = e as AdUnitLifecycleEvent;
+  event.waitUntil(runVendorAuction(event.detail));
+});
+```
+
+Adapter packages are in development — see the [adapter registry interface (#7)](https://github.com/evans-sam/ad-unit-component/issues/7), [GAM (#10)](https://github.com/evans-sam/ad-unit-component/issues/10), [Prebid (#11)](https://github.com/evans-sam/ad-unit-component/issues/11), and [apstag (#12)](https://github.com/evans-sam/ad-unit-component/issues/12).
 
 ## Development
 
