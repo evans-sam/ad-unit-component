@@ -73,6 +73,11 @@ describe("build: subpath exports", () => {
     const firstOutput = result.outputs[0];
     if (!firstOutput) throw new Error("consumer bundle produced no outputs");
     const bundle = await firstOutput.text();
+    // Two patterns: the subpath string an adapter module would import from, and
+    // the double-quoted name literal a real adapter would declare on itself
+    // (e.g. `name: "gam"`). Today the stubs are empty, so both trivially hold.
+    // The assertion gains teeth once #10/#11/#12 land: any code path that pulls
+    // an adapter module in will bring at least one of these markers with it.
     for (const name of ["gam", "prebid", "apstag"]) {
       expect(bundle).not.toMatch(new RegExp(`adapters/${name}`));
       expect(bundle).not.toMatch(new RegExp(`"${name}"`));
