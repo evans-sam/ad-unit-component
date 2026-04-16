@@ -61,12 +61,14 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@biomejs/biome": "^2.3.10",
     "@happy-dom/global-registrator": "^20.9.0",
     "@types/bun": "latest",
     "eslint-plugin-compat": "^7.0.1",
     "lefthook": "^2.0.13",
-    "oxlint": "^1.60.0"
+    "oxlint": "^1.60.0",
+    "publint": "^0.3.18"
   },
   "peerDependencies": {
     "typescript": "^5"
