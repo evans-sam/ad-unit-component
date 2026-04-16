@@ -68,6 +68,25 @@ With `loading="lazy"`, the component attaches internal `waitUntil` gates to `ad-
 - `ad-unit:stage-blocked` / `ad-unit:stage-unblocked` — transition events (`detail: { stage }`)
 - `ad-unit:error` — fires if any `waitUntil` promise rejects; halts the lifecycle (`detail: { stage, error }`)
 
+### Refresh
+
+Call `adUnit.refresh()` to trigger a new lifecycle cycle:
+
+```
+ad-unit:refresh → ad-unit:fetch → ad-unit:render
+```
+
+Refresh reuses the same `waitUntil` stage machinery as the initial connect, but bypasses lazy-loading viewport gates — it is an explicit trigger.
+
+```ts
+const adUnit = document.querySelector("ad-unit") as AdUnit;
+adUnit.refresh();
+```
+
+`adUnit.refreshCount` (readonly) increments before each `ad-unit:refresh` dispatch. The value is carried on every event's `detail.refreshCount`, so adapters can distinguish first-load (`0`) from the N-th refresh. If `refresh()` is called while a cycle is already in flight, the old cycle is aborted and a new one starts. Calling `refresh()` on a disconnected element is a no-op with a console warning.
+
+Scheduling, viewability-gated refresh, max-count caps, and auction batching are adapter concerns — the component exposes only the trigger primitive.
+
 ## Development
 
 ```bash
