@@ -11,11 +11,11 @@ describe("createMockAdapter", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     adapter = createMockAdapter({ auctionDelayMs: 10 });
-    adapter.start();
+    adapter.init();
   });
 
   afterEach(() => {
-    adapter.stop();
+    adapter.destroy();
     host.remove();
   });
 
@@ -121,9 +121,9 @@ describe("createMockAdapter", () => {
     expect(mock?.dataset.refreshCount).toBe("1");
   });
 
-  test("stop() detaches listeners so further connections are ignored", () => {
-    adapter.stop();
-    const unit = createUnit({ code: "post-stop" });
+  test("destroy() detaches listeners so further connections are ignored", () => {
+    adapter.destroy();
+    const unit = createUnit({ code: "post-destroy" });
     host.appendChild(unit);
     expect(unit.container.querySelector(".mock-ad")).toBeNull();
   });

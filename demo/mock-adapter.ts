@@ -1,14 +1,12 @@
-import type { AdUnitLifecycleEvent, BannerFormat } from "../src";
+import type {
+  AdUnitLifecycleEvent,
+  BannerFormat,
+  HeaderBiddingAdapter,
+} from "../src";
 
 export interface MockAdapterOptions {
   auctionDelayMs?: number;
   bidPriceRange?: [number, number];
-}
-
-export interface MockAdapter {
-  start(): void;
-
-  stop(): void;
 }
 
 interface LifecycleDetail {
@@ -37,7 +35,7 @@ interface PendingAuction {
  */
 export function createMockAdapter(
   options: MockAdapterOptions = {},
-): MockAdapter {
+): HeaderBiddingAdapter {
   const auctionDelayMs = options.auctionDelayMs ?? 500;
   const [minPrice, maxPrice] = options.bidPriceRange ?? [0.1, 5.0];
   const pendingAuctions = new Map<string, PendingAuction>();
@@ -83,14 +81,15 @@ export function createMockAdapter(
   };
 
   return {
-    start() {
+    name: "mock",
+    init() {
       if (started) return;
       document.addEventListener("ad-unit:fetch", onFetch);
       document.addEventListener("ad-unit:render", onRender);
       document.addEventListener("ad-unit:disconnected", onDisconnected);
       started = true;
     },
-    stop() {
+    destroy() {
       if (!started) return;
       document.removeEventListener("ad-unit:fetch", onFetch);
       document.removeEventListener("ad-unit:render", onRender);

@@ -1,10 +1,15 @@
 import "../../src/index";
-import type { AdUnit, AdUnitLifecycleEvent } from "../../src";
+import {
+  type AdUnit,
+  type AdUnitLifecycleEvent,
+  HeaderBiddingRegistry,
+} from "../../src";
 import "../event-log";
 import { createMockAdapter } from "../mock-adapter";
 
 const adapter = createMockAdapter();
-adapter.start();
+HeaderBiddingRegistry.register(adapter.name, adapter);
+adapter.init();
 
 const gatedUnit = document.querySelector<AdUnit>("ad-unit[code='user-gated']");
 const baselineUnit = document.querySelector<AdUnit>("ad-unit[code='baseline']");

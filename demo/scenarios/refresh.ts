@@ -1,12 +1,13 @@
 import "../../src/index";
-import type { AdUnit } from "../../src";
+import { type AdUnit, HeaderBiddingRegistry } from "../../src";
 import "../event-log";
 import { createMockAdapter } from "../mock-adapter";
 
 const AUTO_INTERVAL_MS = 5000;
 
 const adapter = createMockAdapter();
-adapter.start();
+HeaderBiddingRegistry.register(adapter.name, adapter);
+adapter.init();
 
 const unit = document.querySelector<AdUnit>("ad-unit[code='refresh-unit']");
 const countNode = document.getElementById("count") as HTMLElement;

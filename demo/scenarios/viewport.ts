@@ -1,9 +1,11 @@
 import "../../src/index";
+import { HeaderBiddingRegistry } from "../../src";
 import "../event-log";
 import { createMockAdapter } from "../mock-adapter";
 
 const adapter = createMockAdapter();
-adapter.start();
+HeaderBiddingRegistry.register(adapter.name, adapter);
+adapter.init();
 
 // Hide the scroll hint once the user has actually scrolled enough to trigger
 // the first fetch zone — no need to keep nagging.
