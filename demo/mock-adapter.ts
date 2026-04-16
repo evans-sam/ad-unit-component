@@ -82,7 +82,9 @@ export function createMockAdapter(
 
   return {
     name: "mock",
-    init() {
+    // Config is accepted for interface conformance but ignored — the factory
+    // already took construction-time options.
+    init(_config?: unknown) {
       if (started) return;
       document.addEventListener("ad-unit:fetch", onFetch);
       document.addEventListener("ad-unit:render", onRender);
