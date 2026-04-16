@@ -27,16 +27,18 @@ GitHub Actions CI/CD for `@ad-unit/core`. Four focused workflow files, each with
 
 Coverage is reported in CI logs only. PR comment reporting is deferred.
 
-### 2. Dependency Review (`dependency-review.yml`)
+### 2. Dependency Audit (`dependency-audit.yml`)
 
-**Trigger:** `pull_request` only
+**Triggers:** `pull_request` (all branches) + `push` to `main`
 
 **Single job — steps:**
 
 1. `actions/checkout`
-2. `actions/dependency-review-action` — fails if new dependencies introduce known vulnerabilities (critical + high severity)
+2. `oven-sh/setup-bun`
+3. `bun install --frozen-lockfile`
+4. `bun audit --audit-level=high` — scans ALL transitive dependencies against the GitHub Advisory Database, exits 1 on high/critical vulnerabilities
 
-Runs as a separate required status check, independently visible in the PR checks list. Guards against supply chain attacks on dependency changes.
+Runs on every PR and push to main. Catches new CVEs against existing deps even when no dependencies changed. Required status check blocks merging.
 
 ### 3. Release Drafter (`release-drafter.yml`)
 
@@ -79,7 +81,7 @@ Rebuilds from the tagged commit rather than caching artifacts from CI. This ensu
 | Path | Purpose |
 |---|---|
 | `.github/workflows/ci.yml` | Lint, typecheck, test, build |
-| `.github/workflows/dependency-review.yml` | Vulnerability audit on PRs |
+| `.github/workflows/dependency-audit.yml` | Full dependency vulnerability scan |
 | `.github/workflows/release-drafter.yml` | Auto-update draft release on PR merge |
 | `.github/workflows/publish.yml` | Publish to npm on release |
 | `.github/release-drafter.yml` | Release drafter category/version config |
@@ -88,7 +90,7 @@ Rebuilds from the tagged commit rather than caching artifacts from CI. This ensu
 
 After workflows are merged, enable branch protection on `main`:
 
-- Require status checks to pass: `ci`, `dependency-review`
+- Require status checks to pass: `ci`, `dependency-audit`
 - Require branches to be up to date before merging
 
 This is a manual step in GitHub repo settings, not automated by the workflows.
@@ -107,5 +109,5 @@ This is a manual step in GitHub repo settings, not automated by the workflows.
 | Publish trigger | `release: published` | Covers both draft-publish and direct release creation |
 | npm auth | Trusted publishing (OIDC) | No long-lived tokens, more secure |
 | Release drafting | `release-drafter/release-drafter` | Standard pattern, auto-accumulates PR changes |
-| Dependency audit | `github/dependency-review-action` | GitHub-native, works without `bun audit` |
+| Dependency audit | `bun audit --audit-level=high` | Scans all deps against GitHub Advisory DB, native to Bun |
 | Coverage reporting | Console output only | Simple; PR comments deferred |
