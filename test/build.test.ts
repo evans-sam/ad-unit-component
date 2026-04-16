@@ -55,9 +55,9 @@ describe("build: subpath exports", () => {
         o.path.endsWith("index.js") &&
         !o.path.includes("adapters/"),
     );
-    expect(core).toBeDefined();
+    if (!core) throw new Error("core entry-point not found in build outputs");
 
-    const text = await core!.text();
+    const text = await core.text();
     expect(text).not.toMatch(/adapters\/(gam|prebid|apstag)/);
   });
 
@@ -70,7 +70,9 @@ describe("build: subpath exports", () => {
     });
     expect(result.success).toBe(true);
 
-    const bundle = await result.outputs[0]!.text();
+    const firstOutput = result.outputs[0];
+    if (!firstOutput) throw new Error("consumer bundle produced no outputs");
+    const bundle = await firstOutput.text();
     for (const name of ["gam", "prebid", "apstag"]) {
       expect(bundle).not.toMatch(new RegExp(`adapters/${name}`));
       expect(bundle).not.toMatch(new RegExp(`"${name}"`));
