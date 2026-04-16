@@ -20,7 +20,7 @@ A typo in the `exports` map — wrong case (`./dist/adapters/Gam.js`), missing e
 
 Two off-the-shelf CLIs gated as the final phase of `bun run build`:
 
-```
+```text
 bun run build
  ├─ build:js        (build.ts → Bun.build)
  ├─ build:types     (tsc --emitDeclarationOnly)
@@ -134,4 +134,4 @@ Both tools are pure-JS Node packages with no native dependencies. `bun install -
 
 - attw uses `npm pack` internally for `--pack .`. GitHub-hosted ubuntu runners ship with Node + npm preinstalled, so this works out of the box in CI; the implementation step should verify by running locally and in a CI dry-run before merging. publint, which runs second, uses `bun pm pack` per `--pack bun`, keeping that half of the chain pure-Bun.
 - The `^0.18` and `^0.3` version ranges are starting points; the implementer should verify the latest stable major at install time and pin appropriately.
-- This work does not touch `src/` or any test files. The diff is `package.json` (devDeps + script), `bun.lockb`, and `.github/workflows/ci.yml` (delete one step).
+- This spec was written under the assumption that the work would be purely tooling-side. The first-run triage in the implementation plan surfaced three publish-correctness bugs that the verifier would have caught: extensionless internal re-exports in `dist/index.d.ts`, exports `types`-condition ordering, and a stale `pkg.module` field. All three were fixed in the same PR (package is pre-release; scope expansion was acceptable). The actual diff ended up touching `src/index.ts`, `src/ad-unit.ts`, `src/registry.ts`, `package.json` (devDeps + script + exports restructure + `module` removal), `bun.lock`, and `.github/workflows/ci.yml` (delete one step).

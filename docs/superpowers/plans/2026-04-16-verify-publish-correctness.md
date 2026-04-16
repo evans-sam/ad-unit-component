@@ -347,7 +347,7 @@ Expected: build succeeds.
 - [ ] **Step 4: Re-run attw and publint to confirm the publint findings are gone**
 
 ```bash
-bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution
+bunx attw --pack . --ignore-rules cjs-resolves-to-esm --ignore-rules no-resolution
 bunx publint --strict --pack bun
 ```
 
@@ -373,7 +373,7 @@ Update the spec's "attw flags" subsection to document the addition of `no-resolu
 
 - [ ] **Step 1: Edit the "attw flags" subsection of the spec**
 
-Locate the bullet starting with `- \`--ignore-rules cjs-resolves-to-esm\`` in the design spec. Extend it so the rule list reads `cjs-resolves-to-esm,no-resolution` and add a one-line justification for `no-resolution`:
+Locate the bullet starting with `- \`--ignore-rules cjs-resolves-to-esm\`` in the design spec. Extend it to a repeated-flag form (attw rejects comma-separated values — verified empirically during Task 4): `--ignore-rules cjs-resolves-to-esm --ignore-rules no-resolution`. Add a one-line justification for `no-resolution`:
 
 The justification, verbatim:
 
@@ -412,7 +412,7 @@ Change it to:
 Add a new `check:exports` script using the finalized flag set decided in Task 3 (`cjs-resolves-to-esm` plus `no-resolution`):
 
 ```json
-"check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution && bunx publint --strict --pack bun",
+"check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm --ignore-rules no-resolution && bunx publint --strict --pack bun",
 ```
 
 The `scripts` block after edit should look like:
@@ -424,7 +424,7 @@ The `scripts` block after edit should look like:
   "build": "bun run build:js && bun run build:types && bun run check:exports",
   "build:js": "bun run build.ts",
   "build:types": "tsc --emitDeclarationOnly",
-  "check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution && bunx publint --strict --pack bun",
+  "check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm --ignore-rules no-resolution && bunx publint --strict --pack bun",
   "test": "bun test",
   "test:watch": "bun test --watch",
   "test:coverage": "bun test --coverage",
