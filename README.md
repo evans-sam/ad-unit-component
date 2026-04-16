@@ -87,6 +87,20 @@ adUnit.refresh();
 
 Scheduling, viewability-gated refresh, max-count caps, and auction batching are adapter concerns — the component exposes only the trigger primitive.
 
+## Adapters
+
+`<ad-unit>` is vendor-agnostic. Vendor-specific behavior (Prebid, GAM, apstag) lives in external adapter packages that subscribe to lifecycle events and act on the component's public surface. The component never imports a vendor SDK.
+
+```ts
+// Example: a simple adapter that runs an auction on fetch
+document.addEventListener("ad-unit:fetch", (e) => {
+  const event = e as AdUnitLifecycleEvent;
+  event.waitUntil(runVendorAuction(event.detail));
+});
+```
+
+Adapter packages are in development — see the [adapter registry interface (#7)](https://github.com/evans-sam/ad-unit-component/issues/7), [GAM (#10)](https://github.com/evans-sam/ad-unit-component/issues/10), [Prebid (#11)](https://github.com/evans-sam/ad-unit-component/issues/11), and [apstag (#12)](https://github.com/evans-sam/ad-unit-component/issues/12).
+
 ## Development
 
 ```bash
