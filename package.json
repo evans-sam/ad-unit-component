@@ -6,7 +6,7 @@
   "author": "Sam Evans (https://github.com/evans-sam)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/evans-sam/ad-unit-component.git"
+    "url": "git+https://github.com/evans-sam/ad-unit-component.git"
   },
   "keywords": [
     "web-component",
