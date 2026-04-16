@@ -126,43 +126,265 @@ Carry this categorization forward into Task 3.
 
 ---
 
-## Task 3: Triage findings, update spec if needed
+## Baseline Findings (recorded after Task 2)
+
+Task 2's baseline run surfaced three real bugs in the package and two findings classified as expected noise. The user approved fixing all three bugs in this PR (the package is pre-release; scope is not a constraint).
+
+**Real bugs to fix:**
+
+1. **`InternalResolutionError` (attw, node16 from CJS + node16 from ESM)** — `dist/index.d.ts` re-exports its barrel modules with extensionless specifiers (`./ad-unit`, `./adapters`, `./registry`, `./types`, `./utils/parse-sizes`). Under `node16` / `nodenext` module resolution, TypeScript requires explicit extensions. Source files in `src/` use the same extensionless form, which `tsc --emitDeclarationOnly` preserves into the emitted `.d.ts`. Fix in source: change relative imports across `src/index.ts`, `src/ad-unit.ts`, `src/registry.ts` to use `.js` extensions (works under `moduleResolution: "bundler"` and emits cleanly for `node16` consumers).
+
+2. **`exports` types-condition ordering (publint, all 5 entries)** — Each entry in `package.json` `exports` lists `"import"` before `"types"`. Conditions are order-sensitive; `"types"` must appear first to be picked up by TypeScript resolvers. Plain reorder fixes this.
+
+3. **`pkg.module` field stale (publint)** — `"module": "index.ts"` points at a source file path that doesn't exist in the published artifact. The `module` field is a legacy bundler hint, fully supplanted by the `exports` map. Remove the field.
+
+**Expected noise (suppress, don't fix):**
+
+4. **attw `NoResolution` for adapter subpaths under `node10`** — node10 ignores the `exports` map entirely; subpath exports inherently fail there. Suppress by adding `no-resolution` to attw's `--ignore-rules` list.
+
+5. **publint warning about `.cts` types for the `require` condition** — publint's conservative-CJS heuristic suggests adding `.cts` types in case a CJS consumer tries to resolve. The package is ESM-only by design (no `require` condition). The cleanest mitigation is **structural**: nest the `types` and code paths inside an `import` condition (`{ "import": { "types": "...", "default": "..." } }`) so there is no top-level `types` field for publint to interpret as CJS-relevant. This is the canonical ESM-only shape and resolves both finding #2 (ordering becomes moot inside `import`) and finding #5 simultaneously.
+
+This `package.json` `exports` shape:
+
+```json
+".": {
+  "import": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  }
+}
+```
+
+…replaces the current flat shape and is what attw/publint consider canonical for ESM-only packages.
+
+---
+
+## Task 3a: Add `.js` extensions to internal imports (fix `InternalResolutionError`)
 
 **Files:**
-- Modify (only if findings beyond `cjs-resolves-to-esm` exist): `docs/superpowers/specs/2026-04-16-verify-publish-correctness-design.md`
+- Modify: `src/index.ts`
+- Modify: `src/ad-unit.ts`
+- Modify: `src/registry.ts`
 
-For every finding categorized as "expected noise" in Task 2 step 4, document the justification in the spec's "attw flags" or "publint flags" section. For every finding categorized as "real bug", make the fix to `package.json` (or other source) here.
+`tsc --emitDeclarationOnly` preserves source-level import specifiers verbatim into emitted `.d.ts` files. For `node16` / `nodenext` consumers to resolve internal type references, the specifiers in source must include the `.js` extension. `moduleResolution: "bundler"` (currently set in `tsconfig.json`) accepts both extensionless and `.js`-suffixed imports, so this change is purely additive at compile time.
 
-- [ ] **Step 1: Apply real-bug fixes if any exist**
+Affected imports (8 total across 3 files):
+- `src/index.ts` — 5 re-exports: `./ad-unit`, `./adapters`, `./registry`, `./types`, `./utils/parse-sizes`
+- `src/ad-unit.ts` — 2 imports: `./types`, `./utils/parse-sizes`
+- `src/registry.ts` — 1 import: `./adapters`
 
-If Task 2 surfaced any genuine package errors, fix them now. The most likely candidate is something stale in `package.json` like an outdated `files` entry or a wrong `main`/`module`/`types` path. Do not invent fixes — only address what the tools reported.
+- [ ] **Step 1: Edit `src/index.ts` — append `.js` to all 5 relative specifiers**
 
-- [ ] **Step 2: Update the spec for any newly-suppressed rules**
-
-For each rule name to be added to attw's `--ignore-rules` beyond `cjs-resolves-to-esm`, edit `docs/superpowers/specs/2026-04-16-verify-publish-correctness-design.md`. In the "attw flags" subsection, extend the bullet about `--ignore-rules` to list the new rule(s) with a one-line justification each. Same pattern if publint flags need adjustment.
-
-If no additional rules are needed, skip this step entirely.
-
-- [ ] **Step 3: Re-run both checks to confirm clean output**
-
-Run:
-
-```bash
-bunx attw --pack . --ignore-rules cjs-resolves-to-esm   # plus any added rules
-bunx publint --strict --pack bun                         # plus any added flags
+Before:
+```ts
+export {
+  AdUnit,
+  type AdUnitLifecycleDetail,
+  AdUnitLifecycleEvent,
+} from "./ad-unit";
+export type { AdServerAdapter, HeaderBiddingAdapter } from "./adapters";
+export {
+  AdapterRegistry,
+  AdServerRegistry,
+  HeaderBiddingRegistry,
+} from "./registry";
+export {
+  type BannerFormat,
+  type BannerMediaType,
+  BannerPosition,
+  type MediaTypes,
+} from "./types";
+export { parseSizes, serializeSizes } from "./utils/parse-sizes";
 ```
 
-Both must exit 0 and report no problems. If anything still fails, return to Task 2 step 4 and re-categorize.
+After: same code, but each `from "./X"` becomes `from "./X.js"`. (All five.)
 
-- [ ] **Step 4: Commit (only if files changed in steps 1 or 2)**
+- [ ] **Step 2: Edit `src/ad-unit.ts` — append `.js` to both relative imports at the top of the file**
 
-```bash
-git add docs/superpowers/specs/2026-04-16-verify-publish-correctness-design.md package.json
-# Adjust the file list to whatever actually changed.
-git commit -m "docs: document attw/publint ignore-rule justifications"
+```ts
+import type { BannerFormat } from "./types.js";
+import { parseSizes, serializeSizes } from "./utils/parse-sizes.js";
 ```
 
-If neither the spec nor the package changed, skip the commit and move on.
+(Replace the two existing extensionless versions.)
+
+- [ ] **Step 3: Edit `src/registry.ts` — append `.js` to the single relative import**
+
+```ts
+import type { AdServerAdapter, HeaderBiddingAdapter } from "./adapters.js";
+```
+
+- [ ] **Step 4: Run the existing test suite to confirm no behavior changes**
+
+```bash
+bun test
+```
+
+Expected: all tests pass (count should match the prior pass count of 166 from PR #31; new tests may have been added since but no test should fail because of these import changes).
+
+- [ ] **Step 5: Run the build to confirm `dist/` still emits cleanly**
+
+```bash
+rm -rf dist
+bun run build
+```
+
+Expected: `build:js` and `build:types` both succeed. The emitted `dist/index.d.ts` should now have `.js` suffixes on its internal re-exports (compare with `cat dist/index.d.ts`).
+
+- [ ] **Step 6: Re-run attw to confirm the InternalResolutionError is gone**
+
+```bash
+bunx attw --pack . --ignore-rules cjs-resolves-to-esm
+```
+
+Expected: no more `InternalResolutionError` (🥴) on the `@ad-unit/core` row. The 💀 (NoResolution) for adapter subpaths under `node10` may still appear — that is the expected-noise finding addressed in Task 3b.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/index.ts src/ad-unit.ts src/registry.ts
+git commit -m "fix(types): add .js extensions to internal imports for node16 type resolution"
+```
+
+---
+
+## Task 3b: Restructure `package.json` exports + remove stale `module` field
+
+**Files:**
+- Modify: `package.json`
+
+Two changes in one logical edit:
+
+1. Restructure each `exports` entry to nested `import: { types, default }` form. This:
+   - Makes `types` come first within the inner condition (fixes publint's ordering complaint).
+   - Removes the top-level `types` field, eliminating publint's CJS-types warning.
+   - Is the canonical shape for ESM-only packages.
+
+2. Remove `"module": "index.ts"` (top-level field). It points at a non-existent path and is supplanted by the exports map.
+
+- [ ] **Step 1: Edit the `exports` block in `package.json`**
+
+Before:
+```json
+"exports": {
+  ".": {
+    "import": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "./adapters/gam": {
+    "import": "./dist/adapters/gam.js",
+    "types": "./dist/adapters/gam.d.ts"
+  },
+  "./adapters/prebid": {
+    "import": "./dist/adapters/prebid.js",
+    "types": "./dist/adapters/prebid.d.ts"
+  },
+  "./adapters/apstag": {
+    "import": "./dist/adapters/apstag.js",
+    "types": "./dist/adapters/apstag.d.ts"
+  },
+  "./adapters/*": {
+    "import": "./dist/adapters/*.js",
+    "types": "./dist/adapters/*.d.ts"
+  }
+}
+```
+
+After:
+```json
+"exports": {
+  ".": {
+    "import": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "./adapters/gam": {
+    "import": {
+      "types": "./dist/adapters/gam.d.ts",
+      "default": "./dist/adapters/gam.js"
+    }
+  },
+  "./adapters/prebid": {
+    "import": {
+      "types": "./dist/adapters/prebid.d.ts",
+      "default": "./dist/adapters/prebid.js"
+    }
+  },
+  "./adapters/apstag": {
+    "import": {
+      "types": "./dist/adapters/apstag.d.ts",
+      "default": "./dist/adapters/apstag.js"
+    }
+  },
+  "./adapters/*": {
+    "import": {
+      "types": "./dist/adapters/*.d.ts",
+      "default": "./dist/adapters/*.js"
+    }
+  }
+}
+```
+
+- [ ] **Step 2: Remove the `"module": "index.ts"` line from `package.json`**
+
+The current package.json has (around line 20):
+```json
+"module": "index.ts",
+```
+
+Delete this line (and trailing comma/whitespace as appropriate to keep valid JSON).
+
+- [ ] **Step 3: Re-run the build to confirm the new shape is consumable**
+
+```bash
+rm -rf dist
+bun run build
+```
+
+Expected: build succeeds.
+
+- [ ] **Step 4: Re-run attw and publint to confirm the publint findings are gone**
+
+```bash
+bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution
+bunx publint --strict --pack bun
+```
+
+Expected:
+- attw: clean (no 🥴 or 💀 outside the wildcard row's expected node10 behavior). The added `no-resolution` ignore covers the legitimate node10/exports-ignored case.
+- publint: clean. The 5 ordering complaints, the `module` complaint, and the CJS-types warning should all be gone.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add package.json
+git commit -m "fix(package): nest types inside import condition; remove stale module field"
+```
+
+---
+
+## Task 3c: Document finalized ignore rules in spec
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-04-16-verify-publish-correctness-design.md`
+
+Update the spec's "attw flags" subsection to document the addition of `no-resolution` to the suppression list, with a one-line justification.
+
+- [ ] **Step 1: Edit the "attw flags" subsection of the spec**
+
+Locate the bullet starting with `- \`--ignore-rules cjs-resolves-to-esm\`` in the design spec. Extend it so the rule list reads `cjs-resolves-to-esm,no-resolution` and add a one-line justification for `no-resolution`:
+
+The justification, verbatim:
+
+> `no-resolution` is suppressed because it fires for adapter subpaths under `node10` resolution — node10 ignores the `exports` map entirely, so any subpath export inherently fails there. This is an inherent limitation of node10 tooling, not a package defect.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-04-16-verify-publish-correctness-design.md
+git commit -m "docs: document no-resolution ignore-rule justification"
+```
 
 ---
 
@@ -187,15 +409,13 @@ Change it to:
 "build": "bun run build:js && bun run build:types && bun run check:exports",
 ```
 
-Add a new `check:exports` script. Use whatever flag set Task 3 settled on. The starting point (no extra rules) is:
+Add a new `check:exports` script using the finalized flag set decided in Task 3 (`cjs-resolves-to-esm` plus `no-resolution`):
 
 ```json
-"check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm && bunx publint --strict --pack bun",
+"check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution && bunx publint --strict --pack bun",
 ```
 
-If Task 3 added rules, extend `--ignore-rules` accordingly.
-
-The `scripts` block after edit should look like (with whatever `check:exports` flags you settled on):
+The `scripts` block after edit should look like:
 
 ```json
 "scripts": {
@@ -204,7 +424,7 @@ The `scripts` block after edit should look like (with whatever `check:exports` f
   "build": "bun run build:js && bun run build:types && bun run check:exports",
   "build:js": "bun run build.ts",
   "build:types": "tsc --emitDeclarationOnly",
-  "check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm && bunx publint --strict --pack bun",
+  "check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm,no-resolution && bunx publint --strict --pack bun",
   "test": "bun test",
   "test:watch": "bun test --watch",
   "test:coverage": "bun test --coverage",
