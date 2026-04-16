@@ -241,9 +241,9 @@ Coverage:
 6. Duplicate `register()` overwrites — `get()` returns the most recently registered adapter
 7. `AdServerRegistry` and `HeaderBiddingRegistry` singletons are independent — registering in one does not leak to the other
 
-Each functional test constructs a fresh `new AdapterRegistry<SomeAdapter>("test")` for isolation. The singleton-independence test (#7) uses the exported `AdServerRegistry` / `HeaderBiddingRegistry` and resets them explicitly in `afterEach` (since they are process-scoped).
+Each functional test constructs a fresh `new AdapterRegistry<SomeAdapter>("test")` for isolation. The singleton-independence test (#7) is the **only** test that touches the exported `AdServerRegistry` / `HeaderBiddingRegistry`; because the registries have no public `unregister()`, it cannot reset them in `afterEach`. It mitigates test-order fragility by using unique suffixed names (`-independence-test`) that cannot collide with any other test in the file. The bivariance test uses its own fresh registry rather than a singleton, so adding a new singleton-touching test does not force a refactor.
 
-The TypeScript bivariance property (concrete adapters narrowing `init()`) is verified by the test file itself compiling — a deliberately typed `const adapter: HeaderBiddingAdapter = { name: "prebid", init(cfg: { units: Record<string, unknown> }) { ... }, destroy() {} }` sits in the test file as a compile-time check.
+The TypeScript bivariance property (concrete adapters narrowing `init()`) is verified by the test file itself compiling — a deliberately typed `const adapter: HeaderBiddingAdapter = { name: "prebid", init(config: { units: Record<string, unknown> }) { ... }, destroy() {} }` sits in the test file as a compile-time check. The narrowed parameter is **required** (no default value), so the check covers the required-argument case, not just the optional one.
 
 ## Out of scope
 

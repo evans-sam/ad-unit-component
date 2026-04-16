@@ -82,6 +82,12 @@ describe("AdapterRegistry", () => {
   });
 });
 
+// The module singletons are process-scoped and cannot be reset — there is no
+// public `unregister()`. This block is the only place that touches them, and
+// it uses unique per-test names (suffixed `-independence-test`) so the state
+// it leaves behind can never collide with anything else in this file. Any
+// future singleton test must follow the same rule or be rewritten to use a
+// fresh `new AdapterRegistry(...)` instance instead.
 describe("module singletons", () => {
   test("AdServerRegistry and HeaderBiddingRegistry are independent", () => {
     const adServer: AdServerAdapter = {
@@ -103,27 +109,29 @@ describe("module singletons", () => {
     );
     expect(HeaderBiddingRegistry.get("gam-independence-test")).toBeUndefined();
   });
+});
 
-  test("concrete adapter with narrowed init() signature is assignable (bivariance)", () => {
-    // This is primarily a compile-time check: method bivariance lets us
-    // narrow `init`'s parameter from `unknown` to `PrebidConfig` even under
-    // strict mode. If TypeScript ever tightens method variance, this file
-    // stops compiling.
+describe("TypeScript bivariance", () => {
+  // Compile-time check: method bivariance lets a concrete adapter declare a
+  // narrower `init(config: PrebidConfig)` and still be assignable to
+  // `HeaderBiddingAdapter`. If TypeScript ever tightens method variance, this
+  // file stops compiling. No default value on `config` so the guarantee
+  // covers the required-argument case, not just the optional one.
+  test("concrete adapter with narrowed required init() param is assignable", () => {
     interface PrebidConfig {
       units: Record<string, unknown>;
     }
 
     const PrebidAdapter: HeaderBiddingAdapter = {
-      name: "prebid-bivariance-test",
-      init(config: PrebidConfig = { units: {} }) {
+      name: "prebid",
+      init(config: PrebidConfig) {
         void config;
       },
       destroy() {},
     };
 
-    HeaderBiddingRegistry.register("prebid-bivariance-test", PrebidAdapter);
-    expect(HeaderBiddingRegistry.get("prebid-bivariance-test")).toBe(
-      PrebidAdapter,
-    );
+    const registry = new AdapterRegistry<HeaderBiddingAdapter>("bivariance");
+    registry.register(PrebidAdapter.name, PrebidAdapter);
+    expect(registry.get("prebid")).toBe(PrebidAdapter);
   });
 });
