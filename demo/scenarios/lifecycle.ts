@@ -1,10 +1,11 @@
 import "../../src/index";
-import type { AdUnit } from "../../src";
+import { type AdUnit, HeaderBiddingRegistry } from "../../src";
 import "../event-log";
 import { createMockAdapter } from "../mock-adapter";
 
 const adapter = createMockAdapter();
-adapter.start();
+HeaderBiddingRegistry.register(adapter.name, adapter);
+adapter.init();
 
 const dynamicHost = document.getElementById("dynamic-units") as HTMLDivElement;
 const addBtn = document.getElementById("add-btn") as HTMLButtonElement;
