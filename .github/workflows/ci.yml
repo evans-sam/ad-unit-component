@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Browser-compat lint
+        run: bun run lint:compat
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Test with coverage
+        run: bun test --coverage
+
+      - name: Build
+        run: bun run build
+
+      - name: Verify build artifacts
+        run: |
+          test -f dist/index.js || { echo "dist/index.js missing"; exit 1; }
+          test -f dist/index.d.ts || { echo "dist/index.d.ts missing"; exit 1; }
+          test -s dist/index.js || { echo "dist/index.js is empty"; exit 1; }
+          test -s dist/index.d.ts || { echo "dist/index.d.ts is empty"; exit 1; }
