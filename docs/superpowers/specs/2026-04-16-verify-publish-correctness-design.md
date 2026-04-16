@@ -90,13 +90,17 @@ The publish workflow ([`.github/workflows/publish.yml`](../../../.github/workflo
 
 ## Failure modes and what they look like
 
-**Path missing from disk.** attw resolution fails with `no-resolution`. Output names the entry, the condition, and the path attempted.
+The two tools have non-overlapping responsibilities once `no-resolution` is suppressed in attw (see attw flags above). **publint is the load-bearing tool for missing-file detection**; attw covers everything else.
 
-**Path exists but types condition wrong.** attw flags `untyped-resolution` for the affected condition; the entry shows a different glyph in the per-condition table.
+**Path missing from disk (enumerated subpath).** publint reports `pkg.exports["./adapters/X"].import.default is ./dist/adapters/Y.js but the file is not published. Is it specified in pkg.files?` — caught at publish-correctness layer because the path isn't in the packed tarball. attw is silent on this case (it shows the entry as 🟢 since `no-resolution` is suppressed). The Task 5 probe in the implementation plan validates this empirically.
 
-**`exports` key has no matching dist file because `files` doesn't include the parent directory.** publint's tarball pack catches this — the file isn't in the published artifact, so attw can't resolve it either, and both tools report.
+**Path missing from disk (wildcard `./adapters/*`).** Same — publint catches: `pkg.exports["./adapters/*"].import.default is ./dist/missing/*.js but does not match any files.` attw shows wildcard entries as `(wildcard)` and performs no per-path resolution check at all on wildcards.
 
-**Wildcard `./adapters/*` accidentally points at a non-existent template.** attw analyzes wildcard entries by attempting to resolve representative consumer import paths; the exact rules-fired here may differ from a missing enumerated path. The implementation triage step should explicitly construct a deliberately-broken wildcard and observe which rule(s) fire, to confirm the gap is closed.
+**Path exists but types condition wrong.** attw flags `untyped-resolution` for the affected condition; the entry shows a different glyph in the per-condition table. publint may or may not also flag.
+
+**`exports` key has no matching dist file because `files` doesn't include the parent directory.** publint's tarball pack catches this — the file isn't in the published artifact, so the path effectively doesn't exist as far as a consumer is concerned.
+
+**Tool-removal hazard.** Because publint is doing the missing-file detection work that attw is suppressed for, `publint --strict` is not optional. If a future maintainer removes publint or drops `--strict`, the `no-resolution` suppression in attw becomes a silent gap — exports-path typos would no longer fail the build. Any change to the publint side of `check:exports` should be reviewed against this constraint.
 
 ## Implementation notes
 
