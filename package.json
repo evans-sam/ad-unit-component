@@ -17,7 +17,6 @@
     "gam",
     "openrtb"
   ],
-  "module": "index.ts",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,9 +26,10 @@
   "scripts": {
     "prepare": "lefthook install",
     "dev": "bun --hot dev.ts",
-    "build": "bun run build:js && bun run build:types",
+    "build": "bun run build:js && bun run build:types && bun run check:exports",
     "build:js": "bun run build.ts",
     "build:types": "tsc --emitDeclarationOnly",
+    "check:exports": "bunx attw --pack . --ignore-rules cjs-resolves-to-esm --ignore-rules no-resolution && bunx publint --strict --pack bun",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -40,33 +40,45 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./adapters/gam": {
-      "import": "./dist/adapters/gam.js",
-      "types": "./dist/adapters/gam.d.ts"
+      "import": {
+        "types": "./dist/adapters/gam.d.ts",
+        "default": "./dist/adapters/gam.js"
+      }
     },
     "./adapters/prebid": {
-      "import": "./dist/adapters/prebid.js",
-      "types": "./dist/adapters/prebid.d.ts"
+      "import": {
+        "types": "./dist/adapters/prebid.d.ts",
+        "default": "./dist/adapters/prebid.js"
+      }
     },
     "./adapters/apstag": {
-      "import": "./dist/adapters/apstag.js",
-      "types": "./dist/adapters/apstag.d.ts"
+      "import": {
+        "types": "./dist/adapters/apstag.d.ts",
+        "default": "./dist/adapters/apstag.js"
+      }
     },
     "./adapters/*": {
-      "import": "./dist/adapters/*.js",
-      "types": "./dist/adapters/*.d.ts"
+      "import": {
+        "types": "./dist/adapters/*.d.ts",
+        "default": "./dist/adapters/*.js"
+      }
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@biomejs/biome": "^2.3.10",
     "@happy-dom/global-registrator": "^20.9.0",
     "@types/bun": "latest",
     "eslint-plugin-compat": "^7.0.1",
     "lefthook": "^2.0.13",
-    "oxlint": "^1.60.0"
+    "oxlint": "^1.60.0",
+    "publint": "^0.3.18"
   },
   "peerDependencies": {
     "typescript": "^5"

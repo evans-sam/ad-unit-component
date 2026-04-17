@@ -35,10 +35,3 @@ jobs:
 
       - name: Build
         run: bun run build
-
-      - name: Verify build artifacts
-        run: |
-          test -f dist/index.js || { echo "dist/index.js missing"; exit 1; }
-          test -f dist/index.d.ts || { echo "dist/index.d.ts missing"; exit 1; }
-          test -s dist/index.js || { echo "dist/index.js is empty"; exit 1; }
-          test -s dist/index.d.ts || { echo "dist/index.d.ts is empty"; exit 1; }

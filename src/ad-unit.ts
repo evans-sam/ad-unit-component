@@ -1,5 +1,5 @@
-import type { BannerFormat } from "./types";
-import { parseSizes, serializeSizes } from "./utils/parse-sizes";
+import type { BannerFormat } from "./types.js";
+import { parseSizes, serializeSizes } from "./utils/parse-sizes.js";
 
 const DEFAULT_FETCH_MARGIN = "200%";
 const DEFAULT_RENDER_MARGIN = "150%";

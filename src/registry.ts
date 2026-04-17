@@ -1,4 +1,4 @@
-import type { AdServerAdapter, HeaderBiddingAdapter } from "./adapters";
+import type { AdServerAdapter, HeaderBiddingAdapter } from "./adapters.js";
 
 export class AdapterRegistry<T extends { readonly name: string }> {
   readonly #label: string;
